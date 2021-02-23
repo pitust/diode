@@ -51,3 +51,35 @@ extern(C) private __gshared int kend;
 ulong get_kend() {
     return cast(ulong)&kend - 0xffffffff80000000;
 }
+
+/// Atomically add
+void atomic_add(ulong* target, ulong val) {
+    asm {
+        mov RAX, target;
+        mov RBX, val;
+        lock;
+        add [RAX], RBX;
+    }
+}
+
+/// Atomically sub
+void atomic_sub(ulong* target, ulong val) {
+    asm {
+        mov RAX, target;
+        mov RBX, val;
+        lock;
+        sub [RAX], RBX;
+    }
+}
+
+/// Atomically xchg
+ulong atomic_xchg(ulong* target, ulong val) {
+    asm {
+        mov RAX, target;
+        mov RBX, val;
+        lock;
+        xchg [RAX], RBX;
+        mov val, RBX;
+    }
+    return val;
+}

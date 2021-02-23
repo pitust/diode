@@ -6,7 +6,7 @@ alias MakeFunction(T) = T function();
 
 
 unittest {
-    AutoInitable!int i = AutoInitable!int((() {
+    AutoInit!int i = AutoInit!int((() {
         return 3;
     }));
     printk("[autoinit] assert uninitialized");
@@ -17,11 +17,11 @@ unittest {
     printk("[autoinit] assert initialized correctly...");
     assert(*i.val() == 3);
 
-    AutoInitable!int j = AutoInitable!int(3);
+    AutoInit!int j = AutoInit!int(3);
     printk("[autoinit] assert initialized correctly...");
     assert(*j.val() == 3);
 
-    AutoInitable!int k = AutoInitable!int((() {
+    AutoInit!int k = AutoInit!int((() {
         return 3;
     }));
     printk("[autoinit] assert uninitialized...");
@@ -30,18 +30,18 @@ unittest {
     assert(*k.val() == 3);
 }
 
-/// Auto-initable struct
-struct AutoInitable(T) {
+/// Auto-initializer
+struct AutoInit(T) {
     align(T.alignof) private byte[T.sizeof] data;
     private bool _is_init = false;
     private MakeFunction!(T) makefcn;
 
-    /// Create AutoInitable
+    /// Create AutoInit
     public this(MakeFunction!(T) val) {
         this._is_init = false;
         this.makefcn = val;
     }
-    /// Create initatied AutoInitable
+    /// Create initatied AutoInit
     public this(T val) {
         this._is_init = true;
         *(cast(T*)this.data.ptr) = val;
@@ -57,7 +57,6 @@ struct AutoInitable(T) {
     /// Initializes the value inside
     void ensure_init() {
         if (!is_init) {
-            import std.conv : emplace;
             this._is_init = true;
             *(cast(T*)this.data.ptr) = this.makefcn();
         }
