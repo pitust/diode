@@ -10,10 +10,8 @@ import kernel.platform;
 import kernel.util;
 
 /// putsk_const_str is like putsk but for const(string)
-void putsk_const_str(const(string) s)
-{
-    foreach (chr; s)
-    {
+void putsk_const_str(const(string) s) {
+    foreach (chr; s) {
         if (chr == 0)
             break;
         outp(DEBUG_IO_PORT, chr);
@@ -21,10 +19,8 @@ void putsk_const_str(const(string) s)
 }
 
 /// putsk_const_str is like putsk but for const(string)
-void putsk_const_str(string s)
-{
-    foreach (chr; s)
-    {
+void putsk_const_str(string s) {
+    foreach (chr; s) {
         if (chr == 0)
             break;
         outp(DEBUG_IO_PORT, chr);
@@ -32,61 +28,49 @@ void putsk_const_str(string s)
 }
 
 /// putsk is a dumb version of printk (with no newline!)
-void putsk(char* s)
-{
-    for (int i = 0; s[i] != 0; i++)
-    {
+void putsk(char* s) {
+    for (int i = 0; s[i] != 0; i++) {
         outp(DEBUG_IO_PORT, s[i]);
     }
 }
 
 /// putsk is a dumb version of printk (with no newline!)
-void putsk(T)(T s)
-{
+void putsk(T)(T s) {
     static assert(is(Unqual!(T) : ArrayMarker!char));
-    foreach (char chr; s)
-    {
+    foreach (char chr; s) {
         outp(DEBUG_IO_PORT, chr);
     }
 }
 
 /// putsk is a dumb version of printk (with no newline!)
-void putsk(char s)
-{
+void putsk(char s) {
     outp(DEBUG_IO_PORT, s);
 }
 
 /// putsk is a dumb version of printk (with no newline!)
-void putsk(immutable(char)* s)
-{
-    for (int i = 0; s[i] != 0; i++)
-    {
+void putsk(immutable(char)* s) {
+    for (int i = 0; s[i] != 0; i++) {
         outp(DEBUG_IO_PORT, s[i]);
     }
 }
 
-private struct ArrayMarker(T)
-{
+private struct ArrayMarker(T) {
 }
 
-private struct IOIterMarker(T)
-{
+private struct IOIterMarker(T) {
 }
 
 /// A hex printer for `T`
-extern (C) struct Hex(T)
-{
+extern (C) struct Hex(T) {
     /// The value of the `hex`
     align(T.alignof) T inner;
     /// Create a new Hex
-    this(T inner)
-    {
+    this(T inner) {
         this.inner = inner;
     }
 }
 
-private template Unqual(T)
-{
+private template Unqual(T) {
     static if (is(T U == shared(const U)))
         alias Unqual = U;
     else static if (is(T U == const U))
@@ -97,43 +81,34 @@ private template Unqual(T)
         alias Unqual = U;
     else static if (__traits(hasMember, T, "ioiter"))
         alias Unqual = IOIterMarker!(ReturnType!(__traits(getMember, T, "ioiter")));
-    else static if (__traits(isStaticArray, T))
-    {
-        static if (is(T U == U[0]))
-        {
+    else static if (__traits(isStaticArray, T)) {
+        static if (is(T U == U[0])) {
             alias Unqual = ArrayMarker!U;
-        }
-        else
-        {
+        } else {
             alias Unqual = ArrayMarker!(typeof(T[0]));
         }
-    }
-    else
+    } else
         alias Unqual = T;
 }
 
-private template UnPtr(T)
-{
+private template UnPtr(T) {
     static if (is(T U == U*))
         alias UnPtr = void*;
     else
         alias UnPtr = T;
 }
 
-private template Deref(T)
-{
+private template Deref(T) {
     static if (is(T U == U*))
         alias Deref = Deref(U);
     else
         alias Deref = T;
 }
 
-private void _printk_outint(string subarray, ulong arg, bool bare = false)
-{
+private void _printk_outint(string subarray, ulong arg, bool bare = false) {
     int pad = 0;
     int base = 10;
-    switch (subarray)
-    {
+    switch (subarray) {
     case "_chr_oob":
         base = 16;
         break;
@@ -172,12 +147,10 @@ private void _printk_outint(string subarray, ulong arg, bool bare = false)
     putsk(arr_offset_correctly);
 }
 
-private void _printk_outint(string subarray, long arg)
-{
+private void _printk_outint(string subarray, long arg) {
     int pad = 0;
     int base = 10;
-    switch (subarray)
-    {
+    switch (subarray) {
     case "hex":
         putsk("0x");
         base = 16;
@@ -209,13 +182,11 @@ private void _printk_outint(string subarray, long arg)
     putsk(arr_offset_correctly);
 }
 
-private template GetOMeta(string Target)
-{
-    const char[] GetOMeta =  "OMeta meta = arg._ometa_" ~ Target ~ ";";
+private template GetOMeta(string Target) {
+    const char[] GetOMeta = "OMeta meta = arg._ometa_" ~ Target ~ ";";
 }
 
-private template HasOMeta(string Target)
-{
+private template HasOMeta(string Target) {
     const char[] HasOMeta = "__traits(compiles, arg._ometa_" ~ Target ~ ")";
 }
 /// An O-Meta
@@ -235,8 +206,7 @@ OMeta hex_ometa() {
     return m;
 }
 
-unittest
-{
+unittest {
     printk("Test printk [short]: {}", cast(short) 3);
     printk("Test printk [ushort]: {}", cast(ushort) 3);
     printk("Test printk [int]: {}", cast(int) 3);
@@ -247,181 +217,111 @@ unittest
     printk("Test printk [char*]: {}", "asdf".ptr);
 }
 
-private void putdyn(ObjTy)(string subarray, ObjTy arg, int prenest = 0, bool is_field = false)
-{
-    if (subarray == ":?")
-    {
+private void putdyn(ObjTy)(string subarray, ObjTy arg, int prenest = 0, bool is_field = false) {
+    if (subarray == ":?") {
         subarray = "";
         is_field = true;
     }
     pragma(msg, "=> putdyn: ", typeof(arg));
     alias T = Unqual!(typeof(arg));
-    static if (is(T : const char[]))
-    {
+    static if (is(T : const char[])) {
         assert(subarray == "");
-        if (is_field)
-        {
+        if (is_field) {
             putsk('"');
-            foreach (chr; arg)
-            {
-                if (chr == '\n')
-                {
+            foreach (chr; arg) {
+                if (chr == '\n') {
                     putsk("\\n");
-                }
-                else if (chr > 0x7f || chr < 0x20)
-                {
+                } else if (chr > 0x7f || chr < 0x20) {
                     putsk("\\x");
                     _printk_outint("_chr_oob", cast(ulong) chr);
-                }
-                else
-                {
+                } else {
                     putsk(chr);
                 }
             }
             putsk('"');
-        }
-        else
-        {
+        } else {
             putsk_const_str(arg);
         }
-    }
-    else static if (is(T : const char*))
-    {
+    } else static if (is(T : const char*)) {
         assert(subarray == "");
-        if (is_field)
-        {
+        if (is_field) {
             putsk('"');
-            for (int i = 0; arg[i]; i++)
-            {
-                if (arg[i] == '\n')
-                {
+            for (int i = 0; arg[i]; i++) {
+                if (arg[i] == '\n') {
                     putsk("\\n");
-                }
-                else if (arg[i] > 0x7f || arg[i] < 0x20)
-                {
+                } else if (arg[i] > 0x7f || arg[i] < 0x20) {
                     putsk("\\x");
                     _printk_outint("_chr_oob", cast(ulong) arg[i]);
-                }
-                else
-                {
+                } else {
                     putsk(arg[i]);
                 }
             }
             putsk('"');
-        }
-        else
-        {
+        } else {
             putsk(arg);
         }
-    }
-    else static if (is(T : ArrayMarker!char))
-    {
+    } else static if (is(T : ArrayMarker!char)) {
         assert(subarray == "");
-        if (is_field)
-        {
+        if (is_field) {
             putsk('"');
-            for (int i = 0; arg[i]; i++)
-            {
-                if (arg[i] == '\n')
-                {
+            for (int i = 0; arg[i]; i++) {
+                if (arg[i] == '\n') {
                     putsk("\\n");
-                }
-                else if (arg[i] > 0x7f || arg[i] < 0x20)
-                {
+                } else if (arg[i] > 0x7f || arg[i] < 0x20) {
                     putsk("\\x");
                     _printk_outint("_chr_oob", cast(ulong) arg[i]);
-                }
-                else
-                {
+                } else {
                     putsk(arg[i]);
                 }
             }
             putsk('"');
-        }
-        else
-        {
+        } else {
             putsk(arg);
         }
-    }
-    else static if (is(T == char))
-    {
+    } else static if (is(T == char)) {
         putsk("'");
-        if (arg == '\n')
-        {
+        if (arg == '\n') {
             putsk("\\n");
-        }
-        else if (arg > 0x7f || arg < 0x20)
-        {
+        } else if (arg > 0x7f || arg < 0x20) {
             putsk("\\x");
             _printk_outint("_chr_oob", cast(ulong) arg);
-        }
-        else
-        {
+        } else {
             putsk(arg);
         }
         putsk("'");
-    }
-    else static if (is(T U == Hex!U))
-    {
+    } else static if (is(T U == Hex!U)) {
         assert(subarray == "");
         putdyn("hex", arg.inner, prenest, is_field);
-    }
-    else static if (is(T == byte))
-    {
+    } else static if (is(T == byte)) {
         _printk_outint(subarray, cast(long) arg);
-    }
-    else static if (is(T == ubyte))
-    {
+    } else static if (is(T == ubyte)) {
         _printk_outint(subarray, cast(ulong) arg);
-    }
-    else static if (is(T == int))
-    {
+    } else static if (is(T == int)) {
         _printk_outint(subarray, cast(long) arg);
-    }
-    else static if (is(T == uint))
-    {
+    } else static if (is(T == uint)) {
         _printk_outint(subarray, cast(ulong) arg);
-    }
-    else static if (is(T == short))
-    {
+    } else static if (is(T == short)) {
         _printk_outint(subarray, cast(long) arg);
-    }
-    else static if (is(T == ushort))
-    {
+    } else static if (is(T == ushort)) {
         _printk_outint(subarray, cast(ulong) arg);
-    }
-    else static if (is(T == long))
-    {
+    } else static if (is(T == long)) {
         _printk_outint(subarray, arg);
-    }
-    else static if (is(T == ulong))
-    {
+    } else static if (is(T == ulong)) {
         _printk_outint(subarray, arg);
-    }
-    else static if (is(T == bool))
-    {
+    } else static if (is(T == bool)) {
         putsk(arg ? "true" : "false");
-    }
-    else static if (is(T == void))
-    {
+    } else static if (is(T == void)) {
         putsk("void");
-    }
-    else static if (is(T == void*))
-    {
+    } else static if (is(T == void*)) {
         assert(subarray == "");
         _printk_outint("ptr", cast(ulong) arg);
-    }
-    else static if (is(T U == ArrayMarker!U))
-    {
+    } else static if (is(T U == ArrayMarker!U)) {
         putsk('[');
         bool is_first = true;
-        foreach (member; arg)
-        {
-            if (is_first)
-            {
+        foreach (member; arg) {
+            if (is_first) {
                 putsk('\n');
-                for (int i = 0; i < prenest; i++)
-                {
+                for (int i = 0; i < prenest; i++) {
                     putsk("   ");
                 }
                 is_first = false;
@@ -431,36 +331,28 @@ private void putdyn(ObjTy)(string subarray, ObjTy arg, int prenest = 0, bool is_
                 putdyn("", member, prenest + 1, true);
             }
             putsk('\n');
-            for (int i = 0; i < prenest; i++)
-            {
+            for (int i = 0; i < prenest; i++) {
                 putsk("   ");
             }
         }
         putsk(']');
-    }
-    else static if (is(T U == IOIterMarker!U))
-    {
+    } else static if (is(T U == IOIterMarker!U)) {
         putsk('[');
         bool is_first = true;
         int max_counter = 0;
-        foreach (member; arg.ioiter())
-        {
+        foreach (member; arg.ioiter()) {
             max_counter++;
-            if (max_counter > 15)
-            {
+            if (max_counter > 15) {
                 putsk("   ... snip");
                 putsk('\n');
-                for (int i = 0; i < prenest; i++)
-                {
+                for (int i = 0; i < prenest; i++) {
                     putsk("   ");
                 }
                 break;
             }
-            if (is_first)
-            {
+            if (is_first) {
                 putsk('\n');
-                for (int i = 0; i < prenest; i++)
-                {
+                for (int i = 0; i < prenest; i++) {
                     putsk("   ");
                 }
                 is_first = false;
@@ -470,49 +362,35 @@ private void putdyn(ObjTy)(string subarray, ObjTy arg, int prenest = 0, bool is_
                 putdyn("", member, prenest + 1, true);
             }
             putsk('\n');
-            for (int i = 0; i < prenest; i++)
-            {
+            for (int i = 0; i < prenest; i++) {
                 putsk("   ");
             }
         }
         putsk(']');
-    }
-    else
-    {
+    } else {
         alias U = UnPtr!(T);
-        static if (is(U == void*))
-        {
+        static if (is(U == void*)) {
             string asdf = T.stringof;
             putsk_const_str(asdf);
             putsk(" @ ");
             _printk_outint("ptr", cast(ulong) arg);
-            if (cast(ulong) arg != 0)
-            {
+            if (cast(ulong) arg != 0) {
                 putsk(" ");
                 putdyn("", *arg, prenest);
             }
-        }
-        else
-        {
-            static if (__traits(hasMember, T, "opFormat"))
-            {
+        } else {
+            static if (__traits(hasMember, T, "opFormat")) {
                 putdyn(subarray, T.opFormat(), prenest);
-            }
-            else
-            {
+            } else {
                 putsk('{');
                 bool is_first = true;
-                static foreach (member; [__traits(allMembers, T)])
-                {
+                static foreach (member; [__traits(allMembers, T)]) {
                     static if (__traits(compiles, putdyn("",
-                            __traits(getMember, arg, member), prenest + 1, true)))
-                    {
+                            __traits(getMember, arg, member), prenest + 1, true))) {
                         static if (!__traits(compiles, __traits(getMember, arg, member)._oskip)) {
-                            if (is_first)
-                            {
+                            if (is_first) {
                                 putsk('\n');
-                                for (int i = 0; i < prenest; i++)
-                                {
+                                for (int i = 0; i < prenest; i++) {
                                     putsk("   ");
                                 }
                                 is_first = false;
@@ -523,14 +401,14 @@ private void putdyn(ObjTy)(string subarray, ObjTy arg, int prenest = 0, bool is_
                             static if (mixin(HasOMeta!(member))) {
                                 {
                                     mixin(GetOMeta!(member));
-                                    putdyn(meta.fmt, __traits(getMember, arg, member), prenest + 1, meta.print_raw);
+                                    putdyn(meta.fmt, __traits(getMember, arg,
+                                            member), prenest + 1, meta.print_raw);
                                 }
                             } else {
                                 putdyn("", __traits(getMember, arg, member), prenest + 1, true);
                             }
                             putsk('\n');
-                            for (int i = 0; i < prenest; i++)
-                            {
+                            for (int i = 0; i < prenest; i++) {
                                 putsk("   ");
                             }
                         }
@@ -544,18 +422,15 @@ private void putdyn(ObjTy)(string subarray, ObjTy arg, int prenest = 0, bool is_
 }
 
 /// Print a string
-void printk(Args...)(string s, Args args)
-{
+void printk(Args...)(string s, Args args) {
     int idx_into_s = 0;
-    foreach (arg; args)
-    {
+    foreach (arg; args) {
 
         // advance s
         while (s[idx_into_s] != '{')
             outp(DEBUG_IO_PORT, s[idx_into_s++]);
         const int og_idx = idx_into_s + 1;
-        while (s[idx_into_s++] != '}')
-        {
+        while (s[idx_into_s++] != '}') {
         }
         const string subarray = s[og_idx .. idx_into_s - 1];
 

@@ -251,3 +251,28 @@ extern(C) size_t strlen(const char* s) {
     for (;s[i] != 0;i++) {}
     return i;
 }
+
+
+/// memcpy - copy memory area
+///
+/// The  memcpy() function copies n bytes from memory area src to memory area dest.
+/// The memory areas must not overlap. Use memmove(3) if the memory
+/// areas do overlap.
+///
+/// The memcpy() function returns a pointer to dest.
+extern(C) byte* memcpy(byte* dst, const byte* src, size_t n) {
+    for (size_t i = 0;i < n;i++) dst[i] = src[i];
+    return dst;
+}
+
+
+/// memset - fill memory with a constant byte
+///
+/// The memset() function fills the first len bytes of the memory 
+/// area pointed to by mem with the constant byte data.
+///
+/// The memset() function returns a pointer to the memory area mem.
+extern(C) byte* memset(byte* mem, byte data, size_t len) {
+    for (size_t i = 0;i < len;i++) mem[i] = data;
+    return mem;
+}

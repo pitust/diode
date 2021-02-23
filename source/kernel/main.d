@@ -37,11 +37,11 @@ extern (C) void __assert(char* assertion, char* file, int line) {
 
 private __gshared ulong test_global = 1;
 
-pragma(mangle, "_start") private extern(C) void kmain(StivaleHeader* info) {
+pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
     const uint COLUMNS = 80; //Screensize
     const uint LINES = 25;
 
-    *(cast(long*)0) = 0xdeadbeef_deadbeef;
+    *(cast(long*) 0) = 0xdeadbeef_deadbeef;
 
     ubyte* vidmem = cast(ubyte*) 0x000B_8000; //Video memory address
 
@@ -50,7 +50,7 @@ pragma(mangle, "_start") private extern(C) void kmain(StivaleHeader* info) {
     }
 
     printk("Hello, {}!", "world");
-    
+
     // make sure that if you try to use TLS you get a bunch of page faults
     // we really don't want you to use TLS
     // mark all globals __gshared
@@ -66,18 +66,19 @@ pragma(mangle, "_start") private extern(C) void kmain(StivaleHeader* info) {
     printk("Stivale tag addr: {}", info.brand);
     printk("Thank {} for blessing our ~flight~ operating system", info.brand);
     foreach (Tag* t; PtrTransformIter!Tag(info.tag0, function Tag* (Tag* e) {
-        return e.next;
-    })) {
+            return e.next;
+        })) {
 
         if (t.ident.inner == 0xe5e76a1b4597a781) {
-            printk(" - Kernel Command Line: {:?}", (cast(TagCommandLine*)t).cmdline);
+            printk(" - Kernel Command Line: {:?}", (cast(TagCommandLine*) t).cmdline);
         }
         if (t.ident.inner == 0x2187f79e8612de07) {
             printk(" - Memory Map");
-            TagMemoryMap* mmap = cast(TagMemoryMap*)t;
-            for (int i = 0;i < mmap.size;i++) {
+            TagMemoryMap* mmap = cast(TagMemoryMap*) t;
+            for (int i = 0; i < mmap.size; i++) {
                 const MemoryMapEntry ent = mmap.entries[i];
-                if (ent.type != 1) continue;
+                if (ent.type != 1)
+                    continue;
                 ulong start = ent.base;
                 const ulong end = ent.size + start;
                 if (start == 0) {
@@ -85,19 +86,27 @@ pragma(mangle, "_start") private extern(C) void kmain(StivaleHeader* info) {
                 }
                 printk("  [{ptr}; {ptr}]", start, end);
                 import kernel.mm : addpage;
-                addpage(cast(ulong)start, cast(ulong)((end - start) / 4096));
+
+                addpage(cast(ulong) start, cast(ulong)((end - start) / 4096));
             }
         }
-        if (t.ident.inner == 0x506461d2950408fa) printk(" - Framebuffer");
-        if (t.ident.inner == 0x6bc1a78ebe871172) printk(" - FB MTRR");
-        if (t.ident.inner == 0x4b6fe466aade04ce) printk(" - Modules");
-        if (t.ident.inner == 0x9e1786930a375e78) printk(" - RSDP");
-        if (t.ident.inner == 0x566a7bed888e1407) printk(" - The Unix Epoch");
-        if (t.ident.inner == 0x359d837855e3858c) printk(" - Firmware Info");
-        if (t.ident.inner == 0x34d1d96339647025) printk(" - Symmetric Multiprocessing Information");
-        if (t.ident.inner == 0x29d1e96239247032) printk(" - PXE Boot Server Information");
+        if (t.ident.inner == 0x506461d2950408fa)
+            printk(" - Framebuffer");
+        if (t.ident.inner == 0x6bc1a78ebe871172)
+            printk(" - FB MTRR");
+        if (t.ident.inner == 0x4b6fe466aade04ce)
+            printk(" - Modules");
+        if (t.ident.inner == 0x9e1786930a375e78)
+            printk(" - RSDP");
+        if (t.ident.inner == 0x566a7bed888e1407)
+            printk(" - The Unix Epoch");
+        if (t.ident.inner == 0x359d837855e3858c)
+            printk(" - Firmware Info");
+        if (t.ident.inner == 0x34d1d96339647025)
+            printk(" - Symmetric Multiprocessing Information");
+        if (t.ident.inner == 0x29d1e96239247032)
+            printk(" - PXE Boot Server Information");
     }
-
 
     printk("IDTR: {}", new_idtr());
 

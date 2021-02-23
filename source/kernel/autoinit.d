@@ -4,11 +4,8 @@ import kernel.io;
 
 alias MakeFunction(T) = T function();
 
-
 unittest {
-    AutoInit!int i = AutoInit!int((() {
-        return 3;
-    }));
+    AutoInit!int i = AutoInit!int((() { return 3; }));
     printk("[autoinit] assert uninitialized");
     assert(!i.is_init());
     i.ensure_init();
@@ -21,9 +18,7 @@ unittest {
     printk("[autoinit] assert initialized correctly...");
     assert(*j.val() == 3);
 
-    AutoInit!int k = AutoInit!int((() {
-        return 3;
-    }));
+    AutoInit!int k = AutoInit!int((() { return 3; }));
     printk("[autoinit] assert uninitialized...");
     assert(!k.is_init());
     printk("[autoinit] assert autoinitialized correctly...");
@@ -44,21 +39,19 @@ struct AutoInit(T) {
     /// Create initatied AutoInit
     public this(T val) {
         this._is_init = true;
-        *(cast(T*)this.data.ptr) = val;
-        this.makefcn = () {
-            assert(false);
-        };
+        *(cast(T*) this.data.ptr) = val;
+        this.makefcn = () { assert(false); };
     }
     /// Gets the value inside
     T* val() {
         this.ensure_init();
-        return (cast(T*)this.data.ptr);
+        return (cast(T*) this.data.ptr);
     }
     /// Initializes the value inside
     void ensure_init() {
         if (!is_init) {
             this._is_init = true;
-            *(cast(T*)this.data.ptr) = this.makefcn();
+            *(cast(T*) this.data.ptr) = this.makefcn();
         }
     }
     /// Is it inited?

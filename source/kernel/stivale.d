@@ -3,14 +3,14 @@ module kernel.stivale;
 import kernel.io : Hex;
 
 /// A tag
-extern(C) struct Tag {
+extern (C) struct Tag {
     /// Tag ID
     align(8) Hex!ulong ident;
     /// Next tag pointer
     align(8) Tag* next;
 }
 /// The header
-extern(C) struct StivaleHeader {
+extern (C) struct StivaleHeader {
     /// The bootloader brand
     char[64] brand;
     /// The bootloader name?
@@ -25,15 +25,16 @@ private const ulong HEADER_TAG_SMP_ID = 0x1ab015085f3273df;
 private const ulong HEADER_TAG_5LV_PAGING_ID = 0x932f477032007e8f;
 private const ulong STRUCT_TAG_CMDLINE_ID = 0xe5e76a1b4597a781;
 /// Command line stivale2 tag
-extern(C) struct TagCommandLine {
+extern (C) struct TagCommandLine {
     /// the tag struct
     align(8) Tag tag;
     /// The command line
     char* cmdline;
 }
+
 private const ulong STRUCT_TAG_MEMMAP_ID = 0x2187f79e8612de07;
 /// Memory map entry
-extern(C) struct MemoryMapEntry {
+extern (C) struct MemoryMapEntry {
     /// Base address
     align(8) ulong base;
     /// Size
@@ -44,7 +45,7 @@ extern(C) struct MemoryMapEntry {
     align(4) uint pad;
 }
 /// Memory map stivale2 tag
-extern(C) struct TagMemoryMap {
+extern (C) struct TagMemoryMap {
     /// the tag struct
     align(8) Tag tag;
     /// The memory map size
@@ -53,6 +54,7 @@ extern(C) struct TagMemoryMap {
     align(8) MemoryMapEntry[0x10000] entries;
 
 }
+
 private const ulong STRUCT_TAG_FRAMEBUFFER_ID = 0x506461d2950408fa;
 private const ulong STRUCT_TAG_FB_MTRR_ID = 0x6bc1a78ebe871172;
 private const ulong STRUCT_TAG_MODULES_ID = 0x4b6fe466aade04ce;
