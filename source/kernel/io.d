@@ -6,6 +6,7 @@ import core.volatile;
 import std.traits;
 import std.algorithm;
 
+import kernel.optional;
 import kernel.platform;
 import kernel.util;
 
@@ -191,6 +192,8 @@ private template HasOMeta(string Target) {
 }
 /// An O-Meta
 struct OMeta {
+    /// Should we ignore the value? If yes, print `fmt`
+    bool ignore = false;
     /// The format string for this O-Meta
     string fmt = "";
     /// Should we print it raw?
@@ -367,6 +370,15 @@ private void putdyn(ObjTy)(string subarray, ObjTy arg, int prenest = 0, bool is_
             }
         }
         putsk(']');
+    } else static if (is(T U == Option!U)) {
+        if (arg.is_some()) {
+            putsk("Some(");
+            putdyn(subarray, *arg.unwrap(), prenest, true);
+            putsk(")");
+        } else {
+            assert(arg.is_none());
+            putsk("None");
+        }
     } else {
         alias U = UnPtr!(T);
         static if (is(U == void*)) {

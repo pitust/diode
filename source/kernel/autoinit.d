@@ -1,10 +1,10 @@
 module kernel.autoinit;
 
-import kernel.io;
-
 alias MakeFunction(T) = T function();
 
 unittest {
+    import kernel.io : printk;
+
     AutoInit!int i = AutoInit!int((() { return 3; }));
     printk("[autoinit] assert uninitialized");
     assert(!i.is_init());
@@ -30,6 +30,11 @@ struct AutoInit(T) {
     align(T.alignof) private byte[T.sizeof] data;
     private bool _is_init = false;
     private MakeFunction!(T) makefcn;
+
+    /// Copy ctor
+    this(ref AutoInit!T rhs) {
+        assert(false);
+    }
 
     /// Create AutoInit
     public this(MakeFunction!(T) val) {

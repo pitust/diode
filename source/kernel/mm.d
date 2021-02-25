@@ -1,6 +1,7 @@
 module kernel.mm;
 
 import kernel.autoinit;
+import kernel.platform : rdrandom;
 import std.conv : emplace;
 
 private extern (C) struct MPageHeader {
@@ -43,7 +44,7 @@ private struct MMRefValue(T) {
 // Our allocator!
 // The algorithm is called RFAlloc, by me
 // It's essencialy an RNG that ensures resources get used nicely.
-// Each page committed lets us use 256K-64 of RAM.
+// Each page committed lets us use a bit of RAM.
 private struct RFAllocPageState {
     byte[2048] bitmap;
     RFAllocPageState*[2] childs;
@@ -87,18 +88,62 @@ private struct RFAllocPageState {
         return el;
     }
 }
-
 private __gshared AutoInit!(RFAllocPageState*) aps = AutoInit!(RFAllocPageState*)((() {
         return RFAllocPageState.create();
     }));
 
-private __gshared AutoInit!(RFAllocPageState*) aps = AutoInit!(RFAllocPageState*)((() {
-        return RFAllocPageState.create();
-    }));
+private __gshared ulong apsdims = 0;
+
+private __gshared ulong poolsize = 0;
+private const ulong poolbase = 0xffff_8000_f000_0000;
+private const ulong MM_ATTEMPTS_RFALLOC = 10;
+
+private void increase_apsdims() {
+    apsdims += 1;
+    RFAllocPageState** apsref = aps.val();
+    RFAllocPageState* apsold = *apsref;
+    *apsref = RFAllocPageState.create();
+    // this reborrow is awkward but makes dscanner shut up so :shrug:
+    (*apsref).childs[0] = &*apsold;
+}
+private void commit_to_pool() {
+    if ((1 << apsdims) == poolsize) {
+        increase_apsdims();
+    }
+    // import kernel.pmap : krwmap, Phys;
+    // krwmap(Phys(poolbase + poolsize), page());
+    assert(false);
+    poolsize += 4096;
+}
+
 /// Allocate some stuff
 T* alloc(T)() {
-    ulong size = (T.sizeof + 15) & 0xffff_ffff_ffff_fff0;
+    const ulong size = (T.sizeof + 15) & 0xffff_ffff_ffff_fff0;
+    if (poolsize == 0) {
+        commit_to_pool();
+    }
+    const ulong ss = size >> 4;
+    while (true) {
+        attempt: for (int i = 0;i < MM_ATTEMPTS_RFALLOC;i++) {
+            const ulong rand = rdrandom() % poolsize;
+            for (ulong j = 0;j < ss;j++) {
+                const ulong v = j + rand;
+                const bool hit = aps.val().get_bitmap_offset_at(v >> 14, v & 0x3fff, apsdims);
+                if (hit) continue attempt;
+            }
+            for (ulong j = 0;j < ss;j++) {
+                const ulong v = j + rand;
+                aps.val().set_bitmap_offset_at(v >> 14, v & 0x3fff, apsdims, true);
+            }
+            return cast(T*)(rand + poolbase);
+        }
+        commit_to_pool();
+    }
+}
 
+/// Free memory
+void free(T)(T* value) {
+    assert(false, "TODO: free");
 }
 
 /// A refernce value

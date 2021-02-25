@@ -7,32 +7,10 @@ import kernel.io;
 import kernel.util;
 import kernel.irq;
 import kernel.stivale;
+import kernel.pmap;
 
 unittest {
 
-}
-
-/// Internal assetion code
-extern (C) void __assert(char* assertion, char* file, int line) {
-    putsk("Kernel assertion failed: ");
-    for (int i = 0; assertion[i] != 0; i++) {
-        outp(DEBUG_IO_PORT, assertion[i]);
-    }
-    putsk(" at ");
-    for (int i = 0; file[i] != 0; i++) {
-        outp(DEBUG_IO_PORT, file[i]);
-    }
-    outp(DEBUG_IO_PORT, ':');
-    char[70] buf;
-    char* ptr = kernel.util.intToString(line, buf.ptr, 10);
-    for (int i = 0; ptr[i] != 0; i++) {
-        outp(DEBUG_IO_PORT, ptr[i]);
-    }
-    outp(DEBUG_IO_PORT, '\n');
-    backtrace();
-    for (;;) {
-        hlt();
-    }
 }
 
 private __gshared ulong test_global = 1;
@@ -115,6 +93,8 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
         u();
     printk("Done!");
 
+    get_page_for(cast(void*)&test_global);
+
     assert(false, "no more stuff to do!");
 
     for (;;) {
@@ -123,17 +103,36 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
 }
 
 unittest {
-
-    static foreach (u; __traits(getUnitTests, kernel.autoinit))
-        u();
-    static foreach (u; __traits(getUnitTests, kernel.irq))
-        u();
-    static foreach (u; __traits(getUnitTests, kernel.io))
-        u();
-    static foreach (u; __traits(getUnitTests, kernel.mm))
-        u();
-    static foreach (u; __traits(getUnitTests, kernel.platform))
-        u();
-    static foreach (u; __traits(getUnitTests, kernel.util))
-        u();
+    catch_assert(() {
+        static foreach (u; __traits(getUnitTests, kernel.autoinit))
+            u();
+    });
+    catch_assert(() {
+        static foreach (u; __traits(getUnitTests, kernel.irq))
+            u();
+    });
+    catch_assert(() {
+        static foreach (u; __traits(getUnitTests, kernel.io))
+            u();
+    });
+    catch_assert(() {
+        static foreach (u; __traits(getUnitTests, kernel.mm))
+            u();
+    });
+    catch_assert(() {
+        static foreach (u; __traits(getUnitTests, kernel.pmap))
+            u();
+    });
+    catch_assert(() {
+        static foreach (u; __traits(getUnitTests, kernel.platform))
+            u();
+    });
+    catch_assert(() {
+        static foreach (u; __traits(getUnitTests, kernel.optional))
+            u();
+    });
+    catch_assert(() {
+        static foreach (u; __traits(getUnitTests, kernel.util))
+            u();
+    });
 }

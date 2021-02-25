@@ -1,6 +1,7 @@
 module kernel.stivale;
 
 import kernel.io : Hex;
+import kernel.optional;
 
 /// A tag
 extern (C) struct Tag {
