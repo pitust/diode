@@ -64,55 +64,55 @@ private void flush_tlb() {
 }
 
 Option!Phys get_page_for(void* va) {
-    ulong* pt = read_cr3();
+    ulong* page_table = read_cr3();
     ulong va_val = (cast(ulong) va) & 0x000f_ffff_ffff_f000;
-    const ushort[4] lvls = [
+    const ushort[4] offsets = [
         (va_val >> 12 >> 9 >> 9 >> 9) & 0x1ff, (va_val >> 12 >> 9 >> 9) & 0x1ff,
         (va_val >> 12 >> 9) & 0x1ff, (va_val >> 12) & 0x1ff
     ];
-    foreach (ushort key; lvls) {
-        if (pt[key] & 0x80) {
-            return Option!Phys(Phys(pt[key] & 0x000f_ffff_ffff_f000));
+    foreach (ushort key; offsets) {
+        if (page_table[key] & 0x80) {
+            return Option!Phys(Phys(page_table[key] & 0x000f_ffff_ffff_f000));
             break;
         }
-        if (!(pt[key] & 1)) {
+        if (!(page_table[key] & 1)) {
             return Option!(Phys).none();
         }
-        pt = cast(ulong*)(pt[key] & 0x000f_ffff_ffff_f000);
+        page_table = cast(ulong*)(page_table[key] & 0x000f_ffff_ffff_f000);
     }
 
-    return Option!Phys(Phys(cast(ulong) pt));
+    return Option!Phys(Phys(cast(ulong) page_table));
 }
 
 Option!(ulong*) get_pte_ptr(void* va) {
-    ulong* pt = read_cr3();
-    ulong* ctlpt = cast(ulong*) 0;
+    ulong* page_table = read_cr3();
+    ulong* control_pte = cast(ulong*) 0;
     ulong va_val = (cast(ulong) va) & 0x000f_ffff_ffff_f000;
-    const ushort[4] lvls = [
+    const ushort[4] offsets = [
         (va_val >> 12 >> 9 >> 9 >> 9) & 0x1ff, (va_val >> 12 >> 9 >> 9) & 0x1ff,
         (va_val >> 12 >> 9) & 0x1ff, (va_val >> 12) & 0x1ff
     ];
     int i = -1;
-    foreach (ushort key; lvls) {
+    foreach (ushort key; offsets) {
         i++;
-        if (pt[key] & 0x80) {
+        if (page_table[key] & 0x80) {
             return Option!(ulong*).none();
         }
-        if (!(pt[key] & 1) && i != 3) {
+        if (!(page_table[key] & 1) && i != 3) {
             import kernel.mm : page;
             import kernel.util : memset;
 
-            void* pg = page();
+            void* new_page_table = page();
             debug printk("Paving a new memory page, index {hex} into PTE at {}, paving {}",
-                    key, &pt[key], pg);
-            memset(cast(byte*) pg, 0, 4096);
-            pt[key] = 0x3 | cast(ulong) pg;
+                    key, &page_table[key], new_page_table);
+            memset(cast(byte*) new_page_table, 0, 4096);
+            page_table[key] = 0x3 | cast(ulong) new_page_table;
         }
-        ctlpt = &pt[key];
-        pt = cast(ulong*)(pt[key] & 0x000f_ffff_ffff_f000);
+        control_pte = &page_table[key];
+        page_table = cast(ulong*)(page_table[key] & 0x000f_ffff_ffff_f000);
     }
 
-    return Option!(ulong*)(ctlpt);
+    return Option!(ulong*)(control_pte);
 }
 /// Initial paging fixups
 void paging_fixups() {
