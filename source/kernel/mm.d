@@ -2,6 +2,7 @@ module kernel.mm;
 
 import kernel.autoinit;
 import kernel.platform : rdrandom;
+import kernel.pmap : Phys;
 import std.conv : emplace;
 
 private extern (C) struct MPageHeader {
@@ -10,6 +11,11 @@ private extern (C) struct MPageHeader {
 }
 
 private __gshared MPageHeader* first = cast(MPageHeader*) 0;
+
+/// Allocate a phys
+Phys phys() {
+    return Phys(cast(ulong) page());
+}
 
 /// Allocate a page
 void* page() {
@@ -20,9 +26,12 @@ void* page() {
         return result;
     }
     first.pagecount -= 1;
-    void* data = cast(void*)(first + first.pagecount * 4096);
-    (cast(long*) data)[0] = 0;
-    (cast(long*) data)[1] = 0;
+    const ulong pc = first.pagecount;
+    MPageHeader* n = first.next;
+    void* data = cast(void*)(first);
+    first = cast(MPageHeader*)(4096 + cast(ulong) first);
+    first.next = &*n;
+    first.pagecount = pc;
     return data;
 }
 
@@ -88,6 +97,7 @@ private struct RFAllocPageState {
         return el;
     }
 }
+
 private __gshared AutoInit!(RFAllocPageState*) aps = AutoInit!(RFAllocPageState*)((() {
         return RFAllocPageState.create();
     }));
@@ -106,6 +116,7 @@ private void increase_apsdims() {
     // this reborrow is awkward but makes dscanner shut up so :shrug:
     (*apsref).childs[0] = &*apsold;
 }
+
 private void commit_to_pool() {
     if ((1 << apsdims) == poolsize) {
         increase_apsdims();
@@ -124,14 +135,15 @@ T* alloc(T)() {
     }
     const ulong ss = size >> 4;
     while (true) {
-        attempt: for (int i = 0;i < MM_ATTEMPTS_RFALLOC;i++) {
+        attempt: for (int i = 0; i < MM_ATTEMPTS_RFALLOC; i++) {
             const ulong rand = rdrandom() % poolsize;
-            for (ulong j = 0;j < ss;j++) {
+            for (ulong j = 0; j < ss; j++) {
                 const ulong v = j + rand;
                 const bool hit = aps.val().get_bitmap_offset_at(v >> 14, v & 0x3fff, apsdims);
-                if (hit) continue attempt;
+                if (hit)
+                    continue attempt;
             }
-            for (ulong j = 0;j < ss;j++) {
+            for (ulong j = 0; j < ss; j++) {
                 const ulong v = j + rand;
                 aps.val().set_bitmap_offset_at(v >> 14, v & 0x3fff, apsdims, true);
             }

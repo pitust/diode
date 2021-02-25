@@ -3,8 +3,10 @@ run: build/kernel.hdd
 	qemu-system-x86_64 -hda build/kernel.hdd -accel kvm \
 		-no-reboot -no-shutdown -s -debugcon stdio -global \
 		isa-debugcon.iobase=0x400 -vnc :1 -cpu host
+al:
+	addr2line --exe build/kernel.elf | sponge
 build/kernel.elf: build/boot.o $(D_SRCS) linker.ld
-	dmd -betterC -unittest -m64 -c $(D_SRCS) -od=build -g -gs -gf -vtls
+	dmd -O -betterC -m64 -c $(D_SRCS) -od=build -g -gs -gf -vtls
 	@rm -f build/kernel.elf
 	ld.lld -nostdlib -T linker.ld -o build/kernel.elf build/boot.o /opt/cross/lib/gcc/x86_64-elf/10.2.0/libgcc.a `find build | grep '\.o$$' | grep -v \/boot\.o` --color-diagnostics 2>&1 | ddemangle
 	@[ -e build/kernel.elf ]

@@ -19,7 +19,11 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
     const uint COLUMNS = 80; //Screensize
     const uint LINES = 25;
 
-    *(cast(long*) 0) = 0xdeadbeef_deadbeef;
+    asm {
+        mov RBX, 0;
+        mov RAX, 0xdeadbeefdeadbeef;
+        mov [RBX], RAX;
+    }
 
     ubyte* vidmem = cast(ubyte*) 0x000B_8000; //Video memory address
 
@@ -41,7 +45,6 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
         wrfsbase RAX;
     }
 
-    printk("Stivale tag addr: {}", info.brand);
     printk("Thank {} for blessing our ~flight~ operating system", info.brand);
     foreach (Tag* t; PtrTransformIter!Tag(info.tag0, function Tag* (Tag* e) {
             return e.next;
@@ -86,14 +89,21 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
             printk(" - PXE Boot Server Information");
     }
 
-    printk("IDTR: {}", new_idtr());
+    paging_fixups();
 
-    printk("Unit tests...");
-    static foreach (u; __traits(getUnitTests, __traits(parent, kmain)))
-        u();
-    printk("Done!");
+    IDTR idtr = new_idtr();
+    asm {
+        lea RAX, idtr;
+        lidt [RAX];
+    }
+    printk("IDTR: {}", idtr);
 
-    get_page_for(cast(void*)&test_global);
+    debug {
+        printk("Unit tests...");
+        static foreach (u; __traits(getUnitTests, __traits(parent, kmain)))
+            u();
+        printk("Done!");
+    }
 
     assert(false, "no more stuff to do!");
 
@@ -106,33 +116,41 @@ unittest {
     catch_assert(() {
         static foreach (u; __traits(getUnitTests, kernel.autoinit))
             u();
+        return 0;
     });
     catch_assert(() {
         static foreach (u; __traits(getUnitTests, kernel.irq))
             u();
+        return 0;
     });
     catch_assert(() {
         static foreach (u; __traits(getUnitTests, kernel.io))
             u();
+        return 0;
     });
     catch_assert(() {
         static foreach (u; __traits(getUnitTests, kernel.mm))
             u();
+        return 0;
     });
     catch_assert(() {
         static foreach (u; __traits(getUnitTests, kernel.pmap))
             u();
+        return 0;
     });
     catch_assert(() {
         static foreach (u; __traits(getUnitTests, kernel.platform))
             u();
+        return 0;
     });
     catch_assert(() {
         static foreach (u; __traits(getUnitTests, kernel.optional))
             u();
+        return 0;
     });
     catch_assert(() {
         static foreach (u; __traits(getUnitTests, kernel.util))
             u();
+        return 0;
     });
 }

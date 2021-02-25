@@ -3,7 +3,8 @@ module kernel.platform;
 import kernel.optional;
 
 /// A nothing
-struct nothing {}
+struct nothing {
+}
 
 /// halt the CPU until an interrupt arrives
 void hlt() {
@@ -94,7 +95,8 @@ struct Lock {
     private ulong l = 0;
     /// Grab a lock
     void lock() {
-        while (atomic_xchg(&this.l, 1)) {}
+        while (atomic_xchg(&this.l, 1)) {
+        }
     }
     /// Unlock
     void unlock() {
@@ -116,39 +118,24 @@ struct jmpbuf {
 }
 
 /// Set Jump
-extern(C) ulong setjmp(jmpbuf* buf);
+extern (C) ulong setjmp(jmpbuf* buf);
 
 /// Long Jump
-extern(C) void longjmp(jmpbuf* buf, ulong value);
+extern (C) void longjmp(jmpbuf* buf, ulong value);
 private __gshared Option!(jmpbuf*) _catch_assert = Option!(jmpbuf*).none();
 
 /// Catch assertions from `fn`
-Option!T catch_assert(T)(T function() fn) {
-    assert(_catch_assert.is_none());
+Option!T catch_assert(T, Args...)(T function(Args) fn, Args args) {
+    Option!(jmpbuf*) _catch_assert_bak = _catch_assert;
     jmpbuf j;
     if (setjmp(&j)) {
         _catch_assert = Option!(jmpbuf*).none();
         return Option!(T).none();
     }
     _catch_assert = Option!(jmpbuf*)(&j);
-    T v = fn();
-    _catch_assert = Option!(jmpbuf*).none();
+    T v = fn(args);
+    _catch_assert = *&_catch_assert_bak;
     return Option!(T)(v);
-}
-
-/// Catch assertions from `fn`
-Option!nothing catch_assert(void function() fn) {
-    assert(_catch_assert.is_none());
-    jmpbuf j;
-    if (setjmp(&j)) {
-        _catch_assert = Option!(jmpbuf*).none();
-        return Option!(nothing).none();
-    }
-    _catch_assert = Option!(jmpbuf*)(&j);
-    fn();
-    nothing n;
-    _catch_assert = Option!(jmpbuf*).none();
-    return Option!(nothing)(n);
 }
 
 /// Internal assetion code
@@ -157,6 +144,7 @@ extern (C) void __assert(char* assertion, char* file, int line) {
     import kernel.io : putsk;
     import core.bitop : outp;
     import kernel.util : intToString;
+
     putsk("Kernel assertion failed: ");
     for (int i = 0; assertion[i] != 0; i++) {
         outp(DEBUG_IO_PORT, assertion[i]);

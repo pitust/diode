@@ -36,6 +36,13 @@ void putsk(char* s) {
 }
 
 /// putsk is a dumb version of printk (with no newline!)
+private void putsk_string(T)(T s) {
+    foreach (char chr; s) {
+        outp(DEBUG_IO_PORT, chr);
+    }
+}
+
+/// putsk is a dumb version of printk (with no newline!)
 void putsk(T)(T s) {
     static assert(is(Unqual!(T) : ArrayMarker!char));
     foreach (char chr; s) {
@@ -82,12 +89,8 @@ private template Unqual(T) {
         alias Unqual = U;
     else static if (__traits(hasMember, T, "ioiter"))
         alias Unqual = IOIterMarker!(ReturnType!(__traits(getMember, T, "ioiter")));
-    else static if (__traits(isStaticArray, T)) {
-        static if (is(T U == U[0])) {
-            alias Unqual = ArrayMarker!U;
-        } else {
-            alias Unqual = ArrayMarker!(typeof(T[0]));
-        }
+    else static if (__traits(compiles, typeof(T[0]))) {
+        alias Unqual = ArrayMarker!(typeof(T[0]));
     } else
         alias Unqual = T;
 }
@@ -208,6 +211,13 @@ OMeta hex_ometa() {
     m.print_raw = false;
     return m;
 }
+/// Get a pointer printer O-Meta
+OMeta ptr_ometa() {
+    OMeta m;
+    m.fmt = "ptr";
+    m.print_raw = false;
+    return m;
+}
 
 unittest {
     printk("Test printk [short]: {}", cast(short) 3);
@@ -243,7 +253,7 @@ private void putdyn(ObjTy)(string subarray, ObjTy arg, int prenest = 0, bool is_
             }
             putsk('"');
         } else {
-            putsk_const_str(arg);
+            putsk_string(arg);
         }
     } else static if (is(T : const char*)) {
         assert(subarray == "");

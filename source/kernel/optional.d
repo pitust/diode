@@ -8,7 +8,7 @@ unittest {
     printk("[optional] is_{some,none} on `none`");
     assert(uninited.is_none());
     assert(!uninited.is_some());
-    
+
     printk("[optional] Create, inited");
     Option!int inited = Option!int(3);
     printk("[optional] is_{some,none} on `Some(3)`");
@@ -18,8 +18,6 @@ unittest {
     assert(3 == *inited.unwrap());
     printk("[optional]: Some(3): {} | None: {}", inited, uninited);
 }
-
-
 
 /// A value that might or might not be there
 struct Option(T) {
@@ -35,6 +33,7 @@ struct Option(T) {
             this._is_some = false;
         }
     }
+
     private this(bool s1, bool s2) {
         this._is_some = false;
     }
@@ -49,6 +48,13 @@ struct Option(T) {
     public this(T val) {
         this._is_some = true;
         *(cast(T*) this.data.ptr) = val;
+    }
+    /// Map if there is something
+    Option!U map(U)(U function(T) mapper) {
+        if (this._is_some) {
+            return Option!(U)(mapper(*this.unwrap()));
+        }
+        return Option!(U).none();
     }
     /// Gets the value inside, asserting it exists
     T* unwrap() {
