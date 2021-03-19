@@ -103,9 +103,6 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
     }
     printk("IDTR: {}", idtr);
 
-    printk2("Hey: {} {}\n", "a", "b");
-    assert(false);
-
     debug {
         printk("Unit tests...");
         static foreach (u; __traits(getUnitTests, __traits(parent, kmain)))
