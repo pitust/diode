@@ -8,10 +8,13 @@ import kernel.util;
 import kernel.irq;
 import kernel.stivale;
 import kernel.pmap;
+import kernel.dbg;
 
 unittest {
 
 }
+
+extern(C) private void fgdt();
 
 private __gshared ulong test_global = 1;
 
@@ -25,6 +28,8 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
         mov [RBX], RAX;
     }
 
+    fgdt();
+    
     ubyte* vidmem = cast(ubyte*) 0x000B_8000; //Video memory address
 
     for (int i = 0; i < COLUMNS * LINES * 2; i++) { //Loops through the screen and clears it
@@ -98,11 +103,18 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
     }
     printk("IDTR: {}", idtr);
 
+    printk2("Hey: {} {}\n", "a", "b");
+    assert(false);
+
     debug {
         printk("Unit tests...");
         static foreach (u; __traits(getUnitTests, __traits(parent, kmain)))
             u();
         printk("Done!");
+    }
+
+    asm {
+        int 3;
     }
 
     assert(false, "no more stuff to do!");

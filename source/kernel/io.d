@@ -37,10 +37,16 @@ void putsk(char* s) {
 
 /// putsk is a dumb version of printk (with no newline!)
 private void putsk_string(T)(T s) {
-    foreach (char chr; s) {
+    foreach (chr; s) {
         outp(DEBUG_IO_PORT, chr);
     }
 }
+
+/// putck prints a char (cough cough outp(DEBUG_IO_PORT, chr) cough)
+void putck(char c) {
+    outp(DEBUG_IO_PORT, c);
+}
+
 
 /// putsk is a dumb version of printk (with no newline!)
 void putsk(T)(T s) {
@@ -87,6 +93,8 @@ private template Unqual(T) {
         alias Unqual = U;
     else static if (is(T U == shared U))
         alias Unqual = U;
+    else static if (is(T == string))
+        alias Unqual = ArrayMarker!char;
     else static if (__traits(hasMember, T, "ioiter"))
         alias Unqual = IOIterMarker!(ReturnType!(__traits(getMember, T, "ioiter")));
     else static if (__traits(compiles, typeof(T[0]))) {
@@ -398,7 +406,7 @@ private void putdyn(ObjTy)(string subarray, ObjTy arg, int prenest = 0, bool is_
             _printk_outint("ptr", cast(ulong) arg);
             if (cast(ulong) arg != 0) {
                 putsk(" ");
-                putdyn("", *arg, prenest);
+                putdyn(subarray, *arg, prenest);
             }
         } else {
             static if (__traits(hasMember, T, "opFormat")) {
@@ -427,7 +435,7 @@ private void putdyn(ObjTy)(string subarray, ObjTy arg, int prenest = 0, bool is_
                                             member), prenest + 1, meta.print_raw);
                                 }
                             } else {
-                                putdyn("", __traits(getMember, arg, member), prenest + 1, true);
+                                putdyn(subarray, __traits(getMember, arg, member), prenest + 1, true);
                             }
                             putsk('\n');
                             for (int i = 0; i < prenest; i++) {

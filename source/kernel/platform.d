@@ -43,7 +43,7 @@ void backtrace() {
     for (;;) {
         // Unwind to previous stack frame
         printk("  {ptr}", stk.rip);
-        if (stk.rbp == cast(Stackframe*) 0)
+        if (stk.rbp == cast(Stackframe*) 0 || stk.rip == 0)
             break;
         stk = stk.rbp;
     }

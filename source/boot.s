@@ -1,4 +1,5 @@
-extern isrhandle
+extern isrhandle_ec
+extern isrhandle_noec
 bits 64
 
 %define HEADER_TAG_FRAMEBUFFER_ID 0x3ecc1bc43d0f7971
@@ -67,6 +68,19 @@ longjmp:
     mov    r15, [rdi + 40]
     ret
 
+fgdt:
+    lgdt [rel GDT64.Pointer]
+    mov ax, GDT64.Data
+    mov ss, ax
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+    pop rax
+    push GDT64.Code
+    push rax
+    retf
+
 section .data
 
 
@@ -77,7 +91,10 @@ section .data
 %macro isrgen 1
 
 isr%1:
+    push rbp
+    lea rbp, [rsp]
     push rax
+    push rbx
     push rcx
     push rdx
     push rsi
@@ -86,13 +103,22 @@ isr%1:
     push r9
     push r10
     push r11
-%if (%1 >= 0x8 && %1 <= 0xE) || %1 == 0x11 || %1 == 0x1E
-    mov rsi, [rsp + 0x48]
-%else
-    mov rsi, 0
-%endif
+    push r12
+    push r13
+    push r14
+    push r15
     mov rdi, %1
-    call isrhandle
+%if (%1 >= 0x8 && %1 <= 0xE) || %1 == 0x11 || %1 == 0x1E
+    lea rsi, [rsp]
+    call isrhandle_ec
+%else
+    lea rsi, [rsp]
+    call isrhandle_noec
+%endif
+    pop r15
+    pop r14
+    pop r13
+    pop r12
     pop r11
     pop r10
     pop r9
@@ -101,18 +127,16 @@ isr%1:
     pop rsi
     pop rdx
     pop rcx
+    pop rbx
     pop rax
-    
-    %if (%1 >= 0x8 && %1 <= 0xE) || %1 == 0x11 || %1 == 0x1E
-        add rsp, 8
-    %endif
-    iret
+    pop rbp
+    iretq
 
 %endmacro
 
 global get_idt_targets
 get_idt_targets:
-    mov rax, [rel idt_targets]
+    lea rax, [rel idt_targets]
     ret
 
 global idt_targets
@@ -129,7 +153,33 @@ isrgen i
 %assign i i+1
 %endrep
 
-
+section .data
+global fgdt
+GDT64:                           ; Global Descriptor Table (64-bit).
+.Null: equ $ - GDT64         ; The null descriptor.
+    dw 0xFFFF                    ; Limit (low).
+    dw 0                         ; Base (low).
+    db 0                         ; Base (middle)
+    db 0                         ; Access.
+    db 1                         ; Granularity.
+    db 0                         ; Base (high).
+.Code: equ $ - GDT64         ; The code descriptor.
+    dw 0                         ; Limit (low).
+    dw 0                         ; Base (low).
+    db 0                         ; Base (middle)
+    db 10011010b                 ; Access (exec/read).
+    db 10101111b                 ; Granularity, 64 bits flag, limit19:16.
+    db 0                         ; Base (high).
+.Data: equ $ - GDT64         ; The data descriptor.
+    dw 0                         ; Limit (low).
+    dw 0                         ; Base (low).
+    db 0                         ; Base (middle)
+    db 10010010b                 ; Access (read/write).
+    db 00000000b                 ; Granularity.
+    db 0                         ; Base (high).
+.Pointer:                    ; The GDT-pointer.
+    dw $ - GDT64 - 1             ; Limit.
+    dq GDT64                     ; Base.
 section .bss
 stack_bottom:
 	resb 0x10000

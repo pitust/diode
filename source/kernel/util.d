@@ -261,7 +261,22 @@ extern(C) size_t strlen(const char* s) {
 ///
 /// The memcpy() function returns a pointer to dest.
 extern(C) byte* memcpy(byte* dst, const byte* src, size_t n) {
-    for (size_t i = 0;i < n;i++) dst[i] = src[i];
+    size_t i = 0;
+    // byte-for-byte copy until we are 26-byte-aligned
+    for (;i < n && (i & 0xf) != 0;i++) dst[i] = src[i];
+    // now, rep movsb
+    const byte* dsti = &dst[i];
+    const byte* srci = &src[i];
+    ulong ni = (n - i) / 8;
+    asm {
+        mov RSI, srci;
+        mov RDI, dsti;
+        mov RCX, ni;
+        rep; movsb;
+    }
+    i = i + (ni * 8);
+    // finally, do the last few bytes
+    for (;i < n;i++) dst[i] = src[i];
     return dst;
 }
 
