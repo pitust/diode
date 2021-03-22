@@ -45,6 +45,7 @@ void backtrace() {
         printk("  {ptr}", stk.rip);
         if (stk.rbp == cast(Stackframe*) 0 || stk.rip == 0)
             break;
+        if (stk.rip < 0xffffffff80000000) break;
         stk = stk.rbp;
     }
 }

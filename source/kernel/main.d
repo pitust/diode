@@ -23,7 +23,10 @@ private __gshared ulong test_global = 1;
 
 private void test2() {
     __gshared ulong[4096] stack;
-
+    task_create!void((void* eh) {
+        printk("OUR TASK!!!");
+    }, cast(void*)0, (cast(void*)stack) + stack.sizeof);
+    sched_yield();
 }
 
 private void test1(void* a) {
@@ -49,7 +52,7 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
         mov RAX, 0xdeadbeefdeadbeef;
         mov [RBX], RAX;
     }
-
+    
     fgdt();
 
     ubyte* vidmem = cast(ubyte*) 0x000B_8000; //Video memory address
@@ -149,6 +152,8 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
     free!uint(b);
 
     printk("{hex}/{hex} bytes used", heap_usage, heap_max);
+
+    test2();
     for (;;) {
         hlt();
     }

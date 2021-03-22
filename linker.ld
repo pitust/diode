@@ -3,10 +3,10 @@ SECTIONS
 
     . = 0xffffffff80200000;
 	_text_begin = .;
-    .text : ALIGN(16777216) {
+    .text : ALIGN(4096) {
         *(.text*)
     }
-	. = ALIGN(16777216);
+	. = ALIGN(4096);
 	_text_end = .;
 
     .rodata : ALIGN(4096) {

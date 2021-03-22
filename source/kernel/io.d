@@ -98,8 +98,8 @@ private template Unqual(T) {
         alias Unqual = ArrayMarker!char;
     else static if (__traits(hasMember, T, "ioiter"))
         alias Unqual = IOIterMarker!(ReturnType!(__traits(getMember, T, "ioiter")));
-    else static if (__traits(compiles, typeof(T[0]))) {
-        alias Unqual = ArrayMarker!(typeof(T[0]));
+    else static if (isArray!(T)) {
+        alias Unqual = ArrayMarker!(typeof(T.init[0]));
     } else
         alias Unqual = T;
 }
@@ -456,7 +456,7 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
                             putsk("   ");
                         }
                     } else static if (!isCallable!(__traits(getMember, arg, member))) {
-                        static if (!__traits(compiles, __traits(getMember, arg, member)._oskip)) {
+                        static if (!__traits(compiles, __traits(getMember, arg, member)._oskip) && !__traits(hasMember, arg, "__noshow_" ~ member)) {
                             if (is_first) {
                                 putsk('\n');
                                 for (int i = 0; i < prenest; i++) {

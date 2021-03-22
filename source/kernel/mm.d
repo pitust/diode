@@ -196,7 +196,7 @@ extern (C) struct HeapBlock {
 
     /// Print it nicely
     void _prnt_value(string subarray, int prenest) {
-        putsk("HeapCell { ");
+        putsk("HeapBlock { ");
         typeinfo.print(cast(void*)((cast(ulong)&this) + 16), subarray, prenest, true);
         putsk(" }");
     }
@@ -220,10 +220,10 @@ Option!(void*) mmIsHeap(void* a) {
     if (value > poolsize) {
         return O();
     }
-    debug assert((*aps.val()).get_bitmap_offset_at(value >> 14, value & 0x3fff,
+    const ulong vs4 = value >> 4;
+    debug assert((*aps.val()).get_bitmap_offset_at(vs4 >> 14, vs4 & 0x3fff,
             apsdims), "Kernel: dangling pointer passed to `mmIsHeap`");
     ulong nego = 0;
-    const ulong vs4 = value >> 4;
     while (true) {
         debug assert((*aps.val()).get_bitmap_offset_at((vs4 - nego) >> 14,
                 (vs4 - nego) & 0x3fff, apsdims));
