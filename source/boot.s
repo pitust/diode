@@ -43,30 +43,71 @@ global longjmp
 global setjmp
 
 setjmp:
-    mov [rdi +  0], rbx
-    mov [rdi +  8], rbp
-    mov [rdi + 16], r12
-    mov [rdi + 24], r13
-    mov [rdi + 32], r14
-    mov [rdi + 40], r15
-    lea rax, [rsp + 8]
-    mov [rdi + 48], rax
-    mov rax, [rsp]
-    mov [rdi + 56], rax
+    push    rbp
+    mov     rbp, rsp
+    push    r15
+    push    r14
+    push    r13
+    push    r12
+    push    rbx
+    mov [rdi], rsp
     mov rax, 0
+longjmp_kleanup:
+    pop     rbx
+    pop     r12
+    pop     r13
+    pop     r14
+    pop     r15
+    pop     rbp
     ret
 
 longjmp:
-    mov    rax, rsi
-    mov     rbp, [rdi + 8]
-    mov    [rdi + 48], rsp
-    push   QWORD [rdi + 56]
-    mov    rbx, [rdi +  0]
-    mov    r12, [rdi + 16]
-    mov    r13, [rdi + 24]
-    mov    r14, [rdi + 32]
-    mov    r15, [rdi + 40]
+    mov rax, rsi
+    mov rsp, [rdi]
+    jmp longjmp_kleanup
+
+extern task_exit
+_taskcall_endtask:
+    lea rax, [rel task_exit]
+    call rax
+    ; eb fe, aka loop
+    dd 0xeb, 0xfe
+
+; on the stack we have rdi and rip
+_taskcall_contcreat:
+    pop rdi
     ret
+
+; This sets up a call to `rip` with the argument of `rdi` with stack at `stack`. The state necessary to resume 
+; into the newly created task is put into `their_state`
+;                rdi                 rsi           rdx        rcx
+; void task_call(ulong* their_state, ulong* stack, ulong rip, ulong rdi)
+
+task_call:
+    mov rax, rsp ; save rsp
+    mov rsp, rsi
+    push r15
+
+    lea r15, [rel _taskcall_endtask]
+    push r15
+
+    push rdx
+    push rcx
+    lea rcx, [rel _taskcall_contcreat]
+    push rcx
+    push 0
+    mov rbp, rsp
+    push 0
+    push 0
+    push 0
+    push 0
+    push 0
+    mov [rdi], rsp
+    mov rsp, rax
+
+    pop r15
+    ret
+
 
 fgdt:
     lgdt [rel GDT64.Pointer]
@@ -108,11 +149,10 @@ isr%1:
     push r14
     push r15
     mov rdi, %1
-%if (%1 >= 0x8 && %1 <= 0xE) || %1 == 0x11 || %1 == 0x1E
     lea rsi, [rsp]
+%if (%1 >= 0x8 && %1 <= 0xE) || %1 == 0x11 || %1 == 0x1E
     call isrhandle_ec
 %else
-    lea rsi, [rsp]
     call isrhandle_noec
 %endif
     pop r15
@@ -130,6 +170,9 @@ isr%1:
     pop rbx
     pop rax
     pop rbp
+%if (%1 >= 0x8 && %1 <= 0xE) || %1 == 0x11 || %1 == 0x1E
+    add rsp, 8 ; error code
+%endif
     iretq
 
 %endmacro
@@ -182,5 +225,5 @@ GDT64:                           ; Global Descriptor Table (64-bit).
     dq GDT64                     ; Base.
 section .bss
 stack_bottom:
-	resb 0x10000
+	resb 0x20000
 stack_top:
