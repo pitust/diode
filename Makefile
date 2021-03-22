@@ -6,6 +6,7 @@ run: build/kernel.hdd
 al:
 	addr2line --exe build/kernel.elf | sponge
 build/kernel.elf: build/boot.o $(D_SRCS) linker.ld
+	find build | grep '\.o$$' | grep -v \/boot\.o | xargs rm -f
 	dmd -O -betterC -m64 -c $(D_SRCS) -od=build -g -gs -gf -vtls
 	@rm -f build/kernel.elf
 	ld.lld -nostdlib -T linker.ld -o build/kernel.elf build/boot.o /opt/cross/lib/gcc/x86_64-elf/10.2.0/libgcc.a `find build | grep '\.o$$' | grep -v \/boot\.o` --color-diagnostics 2>&1 | ddemangle
