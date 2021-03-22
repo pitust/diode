@@ -8,15 +8,37 @@ import kernel.util;
 import kernel.irq;
 import kernel.stivale;
 import kernel.pmap;
-import kernel.dbg;
+import kernel.rtti;
+import kernel.mm;
+import kernel.task;
+import kernel.optional;
 
 unittest {
 
 }
 
-extern(C) private void fgdt();
+extern (C) private void fgdt();
 
 private __gshared ulong test_global = 1;
+
+private void test2() {
+    __gshared ulong[4096] stack;
+
+}
+
+private void test1(void* a) {
+    printk("test1: we got this pointer: {}", a);
+    printk("test1: from RTTI i know it's of type {}", dynamic_typeinfo(a).name);
+
+    Option!(uint*) maybe_uint = dynamic_cast!(uint)(a);
+    Option!(ulong*) maybe_ulong = dynamic_cast!(ulong)(a);
+    if (maybe_uint.is_some()) {
+        printk("test1: as a uint, it's {}", *maybe_uint.unwrap());
+    }
+    if (maybe_ulong.is_some()) {
+        printk("test1: as a ulong, it's {}", *maybe_ulong.unwrap());
+    }
+}
 
 pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
     const uint COLUMNS = 80; //Screensize
@@ -29,7 +51,7 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
     }
 
     fgdt();
-    
+
     ubyte* vidmem = cast(ubyte*) 0x000B_8000; //Video memory address
 
     for (int i = 0; i < COLUMNS * LINES * 2; i++) { //Loops through the screen and clears it
@@ -73,7 +95,7 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
                 printk("  [{ptr}; {ptr}]", start, end);
                 import kernel.mm : addpage;
 
-                addpage(cast(ulong) start, cast(ulong)((end - start) / 4096));
+                addpage(cast(ulong) start, cast(ulong)((end - start) / 4096), true);
             }
         }
         if (t.ident.inner == 0x506461d2950408fa)
@@ -112,10 +134,21 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
 
     asm {
         int 3;
+        // sti;
     }
+    remap(0x20, 0x28);
+    
+    ulong* a = alloc!ulong();
+    *a = 1234;
+    test1(cast(void*) a);
+    free!ulong(a);
 
-    assert(false, "no more stuff to do!");
+    uint* b = alloc!uint();
+    *b = 5678;
+    test1(cast(void*) b);
+    free!uint(b);
 
+    printk("{hex}/{hex} bytes used", heap_usage, heap_max);
     for (;;) {
         hlt();
     }

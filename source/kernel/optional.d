@@ -1,5 +1,8 @@
 module kernel.optional;
 
+import kernel.util : memcpy;
+import std.conv : emplace;
+
 unittest {
     import kernel.io : printk;
 
@@ -19,54 +22,77 @@ unittest {
     printk("[optional]: Some(3): {} | None: {}", inited, uninited);
 }
 
-/// A value that might or might not be there
+/// Is it something? Is it nothing? It's unclear.
 struct Option(T) {
-    align(T.alignof) private byte[T.sizeof] data;
-    private bool _is_some = false;
-    @disable this();
-    /// Copy ctor
-    public this(ref Option!T rhs) {
-        if (rhs._is_some) {
-            this._is_some = true;
-            *(cast(T*) this.data.ptr) = *rhs.unwrap();
-        } else {
-            this._is_some = false;
-        }
-    }
-
-    private this(bool s1, bool s2) {
-        this._is_some = false;
-    }
-    /// Create AutoInit
-    static Option!T none() {
-        Option!T o = Option!T(false, false);
-        o._is_some = false;
-        return o;
-    }
-
-    /// Create an Option with the given value, calling its postblit/copy ctors
-    public this(T val) {
-        this._is_some = true;
-        *(cast(T*) this.data.ptr) = val;
-    }
-    /// Map if there is something
-    Option!U map(U)(U function(T) mapper) {
-        if (this._is_some) {
-            return Option!(U)(mapper(*this.unwrap()));
-        }
-        return Option!(U).none();
-    }
-    /// Gets the value inside, asserting it exists
-    T* unwrap() {
-        assert(this._is_some);
-        return (cast(T*) this.data.ptr);
-    }
-    /// Do we even have a value?
+    align(T.alignof) private char[T.sizeof] buf;
+    private bool is_something = false;
+    private bool __invariant = false;
+    /// Is it something?
     bool is_some() {
-        return this._is_some;
+        assert(__invariant);
+        return is_something;
     }
-    /// Do we _not_ have a value?
+    /// Is it nothing?
     bool is_none() {
-        return !this._is_some;
+        assert(__invariant);
+        return !is_something;
+    }
+    /// Unwrap it
+    T unwrap() {
+        assert(__invariant);
+        assert(is_some());
+        return *cast(T*) buf.ptr;
+    }
+    /// Something
+    static Option!T opCall(ref T t) {
+        Option!(T) e;
+        e.is_something = true;
+        memcpy(cast(byte*) e.buf.ptr, cast(byte*)&t, t.sizeof);
+        emplace(cast(T*) e.buf.ptr, t);
+        e.__invariant = true;
+        return e;
+    }
+    /// Something
+    static Option!T opCall(T t) {
+        Option!(T) e;
+        e.is_something = true;
+        memcpy(cast(byte*) e.buf.ptr, cast(byte*)&t, t.sizeof);
+        emplace(cast(T*) e.buf.ptr, t);
+        e.__invariant = true;
+        return e;
+    }
+    /// Nothing
+    static Option!T opCall() {
+        Option!(T) e;
+        e.__invariant = true;
+        e.is_something = false;
+        return e;
+    }
+
+    /// Map a value (if it's `some`)
+    Option!U map(U)(U function(T t) f) {
+        if (is_something) {
+            return Option!U(f(unwrap()));
+        }
+        return Option!U();
+    }
+
+    /// Map a value (if it's `some`, allowing it to return an option)
+    Option!U and_then(U)(Option!U function(T t) f) {
+        if (is_something) {
+            return f(unwrap());
+        }
+        return Option!U();
+    }
+
+    invariant() {
+        assert(__invariant);
+    }
+
+    ~this() {
+        assert(__invariant);
+        if (is_something) {
+            destroy(*cast(T*) buf.ptr);
+        }
     }
 }

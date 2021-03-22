@@ -1,8 +1,12 @@
 module kernel.mm;
 
 import kernel.autoinit;
-import kernel.platform : rdrandom;
-import kernel.pmap : Phys;
+import kernel.optional;
+import kernel.io;
+import kernel.platform : rdweakrandom;
+import kernel.util : memset;
+import kernel.pmap : Phys, get_pte_ptr;
+import kernel.rtti;
 import std.conv : emplace;
 
 private extern (C) struct MPageHeader {
@@ -17,9 +21,21 @@ Phys phys() {
     return Phys(cast(ulong) page());
 }
 
+private __gshared ulong used = 0;
+private __gshared ulong total = 0;
+
+/// Out of memory!
+void oom_cond() {
+    printk("OOM condition!");
+    printk(" Kernel heap: {hex}/{hex} bytes used", heap_usage, heap_max);
+    printk(" Page frame allocator: {hex}/{hex} pages used", used, total);
+    assert(false, "OOM");
+}
+
 /// Allocate a page
 void* page() {
-    assert(first != cast(MPageHeader*) 0);
+    if (first == cast(MPageHeader*) 0)
+        oom_cond();
     if (first.pagecount == 1) {
         void* result = cast(void*) first;
         first = first.next;
@@ -32,17 +48,24 @@ void* page() {
     first = cast(MPageHeader*)(4096 + cast(ulong) first);
     first.next = &*n;
     first.pagecount = pc;
+    used += 1;
+    memset(cast(byte*) data, 0, 4096);
     return data;
 }
 
 /// Add a bunch of pages to the memory manager
-void addpage(ulong addr, ulong pagecount) {
+void addpage(ulong addr, ulong pagecount, bool isinital = false) {
     MPageHeader* next = first;
     first = cast(MPageHeader*) addr;
     import kernel.io : printk;
 
     first.next = next;
     first.pagecount = pagecount;
+    if (isinital) {
+        total += pagecount;
+    } else {
+        used -= pagecount;
+    }
 }
 
 private struct MMRefValue(T) {
@@ -55,12 +78,33 @@ private struct MMRefValue(T) {
 // It's essencialy an RNG that ensures resources get used nicely.
 // Each page committed lets us use a bit of RAM.
 private struct RFAllocPageState {
-    byte[2048] bitmap;
-    RFAllocPageState*[2] childs;
+    private union {
+        struct {
+            byte[2048] bitmapA;
+            byte[2048] bitmapB;
+        }
+
+        RFAllocPageState*[2] childs;
+    }
 
     bool get_bitmap_offset_at(ulong offset, ulong bitmap_final_offset, ulong depth) {
         if (depth == 0) {
-            return !!(bitmap[bitmap_final_offset >> 3] & (1 << (bitmap_final_offset & 0x7)));
+            return !!(bitmapA[bitmap_final_offset >> 3] & (1 << (bitmap_final_offset & 0x7)));
+        }
+        RFAllocPageState* target = childs[offset & 1];
+        if (target == cast(RFAllocPageState*) 0) {
+            // This is a used-map
+            // if it doesn't even own an RFAllocPageState
+            // (literally the first step in getting a malloc from a region),
+            // it's unused!
+            return false;
+        }
+        return target.get_bitmap_offset_at(offset >> 1, bitmap_final_offset, depth - 1);
+    }
+
+    bool get_bitmap_offset_at_slotb(ulong offset, ulong bitmap_final_offset, ulong depth) {
+        if (depth == 0) {
+            return !!(bitmapB[bitmap_final_offset >> 3] & (1 << (bitmap_final_offset & 0x7)));
         }
         RFAllocPageState* target = childs[offset & 1];
         if (target == cast(RFAllocPageState*) 0) {
@@ -75,8 +119,21 @@ private struct RFAllocPageState {
 
     void set_bitmap_offset_at(ulong offset, ulong bitmap_final_offset, ulong depth, bool value) {
         if (depth == 0) {
-            bitmap[bitmap_final_offset >> 3] &= ~(1 << (bitmap_final_offset & 0x7));
-            bitmap[bitmap_final_offset >> 3] |= ((cast(ulong) value) << (bitmap_final_offset & 0x7));
+            bitmapA[bitmap_final_offset >> 3] &= ~(1 << (bitmap_final_offset & 0x7));
+            bitmapA[bitmap_final_offset >> 3] |= ((cast(ulong) value) << (bitmap_final_offset & 0x7));
+            return;
+        }
+        RFAllocPageState* target = childs[offset & 1];
+        if (target == cast(RFAllocPageState*) 0) {
+            target = childs[offset & 1] = create();
+        }
+        target.set_bitmap_offset_at(offset >> 1, bitmap_final_offset, depth - 1, value);
+    }
+
+    void set_bitmap_offset_at_slotb(ulong offset, ulong bitmap_final_offset, ulong depth, bool value) {
+        if (depth == 0) {
+            bitmapB[bitmap_final_offset >> 3] &= ~(1 << (bitmap_final_offset & 0x7));
+            bitmapB[bitmap_final_offset >> 3] |= ((cast(ulong) value) << (bitmap_final_offset & 0x7));
             return;
         }
         RFAllocPageState* target = childs[offset & 1];
@@ -90,7 +147,9 @@ private struct RFAllocPageState {
         import kernel.util : memset;
 
         RFAllocPageState* el = cast(RFAllocPageState*) page();
-        memset(el.bitmap.ptr, 0, 2048);
+        heap_max += 4096;
+        memset(el.bitmapA.ptr, 0, 2048);
+        memset(el.bitmapB.ptr, 0, 2048);
         el.childs[0] = cast(RFAllocPageState*) 0;
         el.childs[1] = cast(RFAllocPageState*) 0;
 
@@ -105,8 +164,8 @@ private __gshared AutoInit!(RFAllocPageState*) aps = AutoInit!(RFAllocPageState*
 private __gshared ulong apsdims = 0;
 
 private __gshared ulong poolsize = 0;
-private const ulong poolbase = 0xffff_8000_f000_0000;
-private const ulong MM_ATTEMPTS_RFALLOC = 10;
+private const ulong poolbase = 0xffff_800f_f000_0000;
+private const ulong MM_ATTEMPTS_RFALLOC = 3000;
 
 private void increase_apsdims() {
     apsdims += 1;
@@ -118,44 +177,141 @@ private void increase_apsdims() {
 }
 
 private void commit_to_pool() {
-    if ((1 << apsdims) == poolsize) {
+    ulong* a = get_pte_ptr(cast(void*) poolbase + poolsize).unwrap();
+    *a = 3 | cast(ulong) page();
+    poolsize += 4096;
+    heap_max += 4096;
+    if ((1 << (apsdims + 16)) == poolsize) {
         increase_apsdims();
     }
-    // import kernel.pmap : krwmap, Phys;
-    // krwmap(Phys(poolbase + poolsize), page());
-    assert(false);
-    poolsize += 4096;
 }
 
-/// Allocate some stuff
-T* alloc(T)() {
-    const ulong size = (T.sizeof + 15) & 0xffff_ffff_ffff_fff0;
+/// HeapBlock is a header of a heap-allocated object.
+/// It is located 16 bytes _before_ the pointer returned by mmIsHeap.
+extern (C) struct HeapBlock {
+    /// The type of this object
+    kernel.rtti.TypeInfo* typeinfo;
+    /// The size of this object
+    ulong size;
+
+    /// Print it nicely
+    void _prnt_value(string subarray, int prenest) {
+        putsk("HeapCell { ");
+        typeinfo.print(cast(void*)((cast(ulong)&this) + 16), subarray, prenest, true);
+        putsk(" }");
+    }
+}
+
+static assert(HeapBlock.sizeof == 16);
+
+/// How much bytes of the kernel heap are in use
+__gshared ulong heap_usage = 0;
+/// How much bytes of the kernel heap are committed
+__gshared ulong heap_max = 0;
+private __gshared ulong spillbits = 0;
+
+/// is `arg` on the heap? If yes, tells you where it starts.
+Option!(void*) mmIsHeap(void* a) {
+    alias O = Option!(void*);
+    ulong value = cast(ulong) a - poolbase;
+    if (cast(ulong) a < poolbase) {
+        return O();
+    }
+    if (value > poolsize) {
+        return O();
+    }
+    debug assert((*aps.val()).get_bitmap_offset_at(value >> 14, value & 0x3fff,
+            apsdims), "Kernel: dangling pointer passed to `mmIsHeap`");
+    ulong nego = 0;
+    const ulong vs4 = value >> 4;
+    while (true) {
+        debug assert((*aps.val()).get_bitmap_offset_at((vs4 - nego) >> 14,
+                (vs4 - nego) & 0x3fff, apsdims));
+        if ((*aps.val()).get_bitmap_offset_at_slotb((vs4 - nego) >> 14,
+                (vs4 - nego) & 0x3fff, apsdims))
+            return O(poolbase + 16 + cast(void*)(value - (nego << 4)));
+        nego++;
+    }
+    return O();
+}
+
+/// is `arg` on the heap? If yes, tells you where its corresponding HeapBlock is placed.
+Option!(HeapBlock*) mmGetHeapBlock(void* a) {
+    return mmIsHeap(a).map!(HeapBlock*)((void* a) {
+        return cast(HeapBlock*)(cast(ulong) a - 16);
+    });
+}
+
+private void* kalloc(ulong size) {
+    size = (size + 15) & 0xffff_ffff_ffff_fff0;
     if (poolsize == 0) {
         commit_to_pool();
     }
     const ulong ss = size >> 4;
     while (true) {
-        attempt: for (int i = 0; i < MM_ATTEMPTS_RFALLOC; i++) {
-            const ulong rand = rdrandom() % poolsize;
+        for (int i = 0; i < MM_ATTEMPTS_RFALLOC; i++) {
+            const ulong rand = (rdweakrandom() % poolsize) & ~0xf;
+            bool success = true;
             for (ulong j = 0; j < ss; j++) {
-                const ulong v = j + rand;
-                const bool hit = aps.val().get_bitmap_offset_at(v >> 14, v & 0x3fff, apsdims);
-                if (hit)
-                    continue attempt;
+                const ulong v = j + (rand >> 4);
+                const bool hit = (*aps.val()).get_bitmap_offset_at(v >> 14, v & 0x3fff, apsdims);
+                if (hit) {
+                    success = false;
+                    break;
+                }
             }
+            if (!success)
+                continue;
             for (ulong j = 0; j < ss; j++) {
-                const ulong v = j + rand;
-                aps.val().set_bitmap_offset_at(v >> 14, v & 0x3fff, apsdims, true);
+                const ulong v = j + (rand >> 4);
+                (*aps.val()).set_bitmap_offset_at(v >> 14, v & 0x3fff, apsdims, true);
             }
-            return cast(T*)(rand + poolbase);
+            (*aps.val()).set_bitmap_offset_at_slotb(rand >> 18, (rand >> 4) & 0x3fff, apsdims, true);
+            heap_usage += size;
+            heap_usage += ss / 8;
+            spillbits += ss % 8;
+            while (spillbits > 8) {
+                spillbits -= 8;
+                heap_usage += 1;
+            }
+            return cast(void*)(rand + poolbase);
         }
         commit_to_pool();
     }
+    assert(false);
+}
+
+private void kfree(void* value, ulong size) {
+    const ulong addr = cast(ulong) value - poolbase;
+    size = (size + 15) & 0xffff_ffff_ffff_fff0;
+    const ulong ss = size >> 4;
+    for (ulong j = 0; j < ss; j++) {
+        const ulong v = j + (addr >> 4);
+        (*aps.val()).set_bitmap_offset_at(v >> 14, v & 0x3fff, apsdims, false);
+    }
+    (*aps.val()).set_bitmap_offset_at_slotb((addr >> 4) >> 14, (addr >> 4) & 0x3fff, apsdims, false);
+    heap_usage -= ss / 8;
+    heap_usage -= size;
+    spillbits -= ss % 8;
+    while (spillbits < 0) {
+        spillbits += 8;
+        heap_usage -= 1;
+    }
+}
+
+/// Allocate some stuff
+T* alloc(T)() {
+    const ulong size = (T.sizeof + 15) & 0xffff_ffff_ffff_fff0;
+    HeapBlock* hblk = cast(HeapBlock*) kalloc(size + 16);
+    hblk.typeinfo = typeinfo!T();
+    hblk.size = size;
+    return cast(T*)(16 + cast(ulong)hblk);
 }
 
 /// Free memory
 void free(T)(T* value) {
-    assert(false, "TODO: free");
+    HeapBlock* allocbase = cast(HeapBlock*)((cast(ulong)value) - 16);
+    kfree(cast(void*) allocbase, allocbase.size + 16);
 }
 
 /// A refernce value

@@ -50,8 +50,46 @@ void backtrace() {
 }
 /// Reload CS
 extern (C) void reload_cs();
+private ulong _rdrand() {
+    ulong raw;
+    asm {
+        rdrand RAX;
+        mov raw, RAX;
+    }
+    return raw;
+}
+private ulong _rdrand2() {
+    ulong raw = 0;
+    while (!raw) raw = _rdrand();
+    return raw;
+}
 /// Get a random number
-extern (C) ulong rdrandom();
+ulong rdrandom() {
+    const ulong lo = _rdrand2();
+    const ulong hi = _rdrand2();
+    return (lo >> 32) | (hi & 0xffff_ffff_0000_0000);
+}
+private __gshared ulong seed = 0;
+private __gshared ulong bk2 = 0;
+private __gshared ulong step = 63;
+/// Get a (cryptographicaly weak) random number
+uint rdshortweakrandom() {
+    step += 1;
+    if (step == 64) {
+        step = 0;
+        seed ^= bk2 = rdrandom();
+    }
+    seed ^= bk2 << 1;
+    const ulong bk2lsb = bk2 >> 63;
+    bk2 <<= 1;
+    bk2 |= bk2lsb;
+    return seed & 0xffff_ffff;
+}
+/// Get a (cryptographicaly shit) random number
+ulong rdweakrandom() {
+    return (cast(ulong)rdshortweakrandom()) | ((cast(ulong)rdshortweakrandom()) << 32);
+}
+
 extern (C) private __gshared int kend;
 /// Get kernel end
 ulong get_kend() {
@@ -122,7 +160,7 @@ extern (C) ulong setjmp(jmpbuf* buf);
 
 /// Long Jump
 extern (C) void longjmp(jmpbuf* buf, ulong value);
-private __gshared Option!(jmpbuf*) _catch_assert = Option!(jmpbuf*).none();
+private __gshared Option!(jmpbuf*) _catch_assert = Option!(jmpbuf*)();
 
 /// Catch assertions from `fn`
 Option!T catch_assert(T, Args...)(T function(Args) fn, Args args) {
@@ -162,7 +200,7 @@ extern (C) void __assert(char* assertion, char* file, int line) {
     outp(DEBUG_IO_PORT, '\n');
     backtrace();
     if (_catch_assert.is_some()) {
-        longjmp(*_catch_assert.unwrap(), 1);
+        longjmp(_catch_assert.unwrap(), 1);
     }
     for (;;) {
         hlt();

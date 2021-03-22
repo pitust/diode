@@ -76,7 +76,7 @@ Option!Phys get_page_for(void* va) {
             break;
         }
         if (!(page_table[key] & 1)) {
-            return Option!(Phys).none();
+            return Option!(Phys)();
         }
         page_table = cast(ulong*)(page_table[key] & 0x000f_ffff_ffff_f000);
     }
@@ -96,7 +96,7 @@ Option!(ulong*) get_pte_ptr(void* va) {
     foreach (ushort key; offsets) {
         i++;
         if (page_table[key] & 0x80) {
-            return Option!(ulong*).none();
+            return Option!(ulong*)();
         }
         if (!(page_table[key] & 1) && i != 3) {
             import kernel.mm : page;

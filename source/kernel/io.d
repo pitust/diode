@@ -35,6 +35,14 @@ void putsk(char* s) {
     }
 }
 
+
+/// putsk is a dumb version of printk (with no newline!)
+void putsk(immutable(char)[] s) {
+    foreach (chr; s) {
+        outp(DEBUG_IO_PORT, chr);
+    }
+}
+
 /// putsk is a dumb version of printk (with no newline!)
 private void putsk_string(T)(T s) {
     foreach (chr; s) {
@@ -59,13 +67,6 @@ void putsk(T)(T s) {
 /// putsk is a dumb version of printk (with no newline!)
 void putsk(char s) {
     outp(DEBUG_IO_PORT, s);
-}
-
-/// putsk is a dumb version of printk (with no newline!)
-void putsk(immutable(char)* s) {
-    for (int i = 0; s[i] != 0; i++) {
-        outp(DEBUG_IO_PORT, s[i]);
-    }
 }
 
 private struct ArrayMarker(T) {
@@ -205,6 +206,8 @@ private template HasOMeta(string Target) {
 struct OMeta {
     /// Should we ignore the value? If yes, print `fmt`
     bool ignore = false;
+    /// Should we _fully_ ignore the value?
+    bool nuke = false;
     /// The format string for this O-Meta
     string fmt = "";
     /// Should we print it raw?
@@ -217,6 +220,12 @@ OMeta hex_ometa() {
     OMeta m;
     m.fmt = "hex";
     m.print_raw = false;
+    return m;
+}
+/// Get a hex printer O-Meta
+OMeta disabler_ometa() {
+    OMeta m;
+    m.nuke = true;
     return m;
 }
 /// Get a pointer printer O-Meta
@@ -238,7 +247,14 @@ unittest {
     printk("Test printk [char*]: {}", "asdf".ptr);
 }
 
-private void putdyn(ObjTy)(string subarray, ObjTy arg, int prenest = 0, bool is_field = false) {
+/// Print an object!
+void putdyn(ObjTy)(string subarray, ObjTy arg, int prenest = 0, bool is_field = false) {
+    ObjTy arg2 = arg;
+    putdyn(subarray, arg2, prenest, is_field);
+}
+
+/// Print an object!
+void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_field = false) {
     if (subarray == ":?") {
         subarray = "";
         is_field = true;
@@ -285,19 +301,19 @@ private void putdyn(ObjTy)(string subarray, ObjTy arg, int prenest = 0, bool is_
         assert(subarray == "");
         if (is_field) {
             putsk('"');
-            for (int i = 0; arg[i]; i++) {
-                if (arg[i] == '\n') {
+            foreach (chr; arg) {
+                if (chr == '\n') {
                     putsk("\\n");
-                } else if (arg[i] > 0x7f || arg[i] < 0x20) {
+                } else if (chr > 0x7f || chr < 0x20) {
                     putsk("\\x");
-                    _printk_outint("_chr_oob", cast(ulong) arg[i]);
+                    _printk_outint("_chr_oob", cast(ulong) chr);
                 } else {
-                    putsk(arg[i]);
+                    putsk(chr);
                 }
             }
             putsk('"');
         } else {
-            putsk(arg);
+            putsk_string(arg);
         }
     } else static if (is(T == char)) {
         putsk("'");
@@ -391,7 +407,7 @@ private void putdyn(ObjTy)(string subarray, ObjTy arg, int prenest = 0, bool is_
     } else static if (is(T U == Option!U)) {
         if (arg.is_some()) {
             putsk("Some(");
-            putdyn(subarray, *arg.unwrap(), prenest, true);
+            putdyn(subarray, arg.unwrap(), prenest, true);
             putsk(")");
         } else {
             assert(arg.is_none());
@@ -399,7 +415,13 @@ private void putdyn(ObjTy)(string subarray, ObjTy arg, int prenest = 0, bool is_
         }
     } else {
         alias U = UnPtr!(T);
-        static if (is(U == void*)) {
+        static if (is(U == void*) && __traits(hasMember, T, "__hide_deref")) {
+            if (cast(ulong) arg != 0) {
+                putdyn(subarray, *arg, prenest);
+            } else {
+                putsk("(null)");
+            }
+        } else static if (is(U == void*)) {
             string asdf = T.stringof;
             putsk_const_str(asdf);
             putsk(" @ ");
@@ -411,12 +433,29 @@ private void putdyn(ObjTy)(string subarray, ObjTy arg, int prenest = 0, bool is_
         } else {
             static if (__traits(hasMember, T, "opFormat")) {
                 putdyn(subarray, T.opFormat(), prenest);
+            } else static if (__traits(hasMember, T, "opFormatter")) {
+                arg.opFormatter(subarray, prenest);
             } else {
                 putsk('{');
                 bool is_first = true;
                 static foreach (member; [__traits(allMembers, T)]) {
-                    static if (__traits(compiles, putdyn("",
-                            __traits(getMember, arg, member), prenest + 1, true))) {
+                    static if (member.length > 6 && member[0..6] == "_prnt_") {
+                        if (is_first) {
+                            putsk('\n');
+                            for (int i = 0; i < prenest; i++) {
+                                putsk("   ");
+                            }
+                            is_first = false;
+                        }
+                        putsk("   ");
+                        putsk(member[6..member.length]);
+                        putsk(": ");
+                        __traits(getMember, arg, member)(subarray, prenest + 1);
+                        putsk('\n');
+                        for (int i = 0; i < prenest; i++) {
+                            putsk("   ");
+                        }
+                    } else static if (!isCallable!(__traits(getMember, arg, member))) {
                         static if (!__traits(compiles, __traits(getMember, arg, member)._oskip)) {
                             if (is_first) {
                                 putsk('\n');
