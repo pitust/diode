@@ -26,12 +26,12 @@ private void test2() {
     task_create!void((void* eh) {
         printk("OUR TASK!!!");
     }, cast(void*)0, (cast(void*)stack) + stack.sizeof);
-    sched_yield();
 }
 
 private void test1(void* a) {
     printk("test1: we got this pointer: {}", a);
     printk("test1: from RTTI i know it's of type {}", dynamic_typeinfo(a).name);
+    printk("test1: and it's HeapBlock is {}", mmGetHeapBlock(a));
 
     Option!(uint*) maybe_uint = dynamic_cast!(uint)(a);
     Option!(ulong*) maybe_ulong = dynamic_cast!(ulong)(a);
@@ -44,9 +44,6 @@ private void test1(void* a) {
 }
 
 pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
-    const uint COLUMNS = 80; //Screensize
-    const uint LINES = 25;
-
     asm {
         mov RBX, 0;
         mov RAX, 0xdeadbeefdeadbeef;
@@ -54,26 +51,8 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
     }
     
     fgdt();
-
-    ubyte* vidmem = cast(ubyte*) 0x000B_8000; //Video memory address
-
-    for (int i = 0; i < COLUMNS * LINES * 2; i++) { //Loops through the screen and clears it
-        volatileStore(vidmem + i, 0);
-    }
-
+    
     printk("Hello, {}!", "world");
-
-    // make sure that if you try to use TLS you get a bunch of page faults
-    // we really don't want you to use TLS
-    // mark all globals __gshared
-    ulong tls = 0x0000_7fff_ffff_ffff;
-    asm {
-        mov RAX, CR4;
-        or RAX, 0x10000;
-        mov CR4, RAX;
-        mov RAX, [tls];
-        wrfsbase RAX;
-    }
 
     printk("Thank {} for blessing our ~flight~ operating system", info.brand);
     foreach (Tag* t; PtrTransformIter!Tag(info.tag0, function Tag* (Tag* e) {
@@ -135,9 +114,10 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
         printk("Done!");
     }
 
+    ensure_task_init();
     asm {
         int 3;
-        // sti;
+        sti;
     }
     remap(0x20, 0x28);
     

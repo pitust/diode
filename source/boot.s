@@ -17,6 +17,11 @@ bits 64
 %define STRUCT_TAG_SMP_ID 0x34d1d96339647025
 %define STRUCT_TAG_PXE_SERVER_INFO 0x29d1e96239247032
 
+TASK_FLD_STATE equ 0
+TASK_FLD_PREV equ 8
+TASK_FLD_NEXT equ 16
+TASK_FLD_DATA equ 24
+
 section .stivale2hdr
 global stivale_hdr
 global task_call
@@ -44,6 +49,8 @@ global asm_switch
 global asm_exit
 global setjmp
 global longjmp
+global _D4core5bitop4outpFNbNikkZh
+global _rdrand
 
 extern sched_switch
 
@@ -63,7 +70,7 @@ setjmp:
 
 longjmp:
     mov    rax, rsi
-    mov     rbp, [rdi + 8]
+    mov    rbp, [rdi + 8]
     mov    [rdi + 48], rsp
     push   QWORD [rdi + 56]
     mov    rbx, [rdi +  0]
@@ -73,71 +80,112 @@ longjmp:
     mov    r15, [rdi + 40]
     ret
 
+extern dealloc_c
+
 asm_exit:
+    ; cur = [cur_task]
+    mov rax, [rel cur_task]
+    ; cur->prev->next = cur->next
+
+    ; rbx = cur->prev
+    mov rbx, [rax + TASK_FLD_PREV]
+    ; rcx = cur->next
+    mov rcx, [rax + TASK_FLD_NEXT]
+    ; cur->prev (rbx)->next = cur->next (rcx)
+    mov [rbx + TASK_FLD_NEXT], rcx
+    mov rdi, rax
+    call dealloc_c
+    jmp asm_switch.resume
+
+global createc
+;              rdi       rsi          rdx            rcx
+; void createc(c* the_c, void* stack, ulong the_rdi, ulong the_rip)
+createc:
     cli
-    mov rsp, rdi
-    pop rdi
-    pop r15
-    pop r14
-    pop r13
-    pop r12
-    pop rbp
-    pop rbx
-    popf
+    xchg rsi, rsp
+
+    push rcx ; rip
+    push rbp
+    lea rbp, [rsp]
+    pushf
+    cli
+    push rax    ; rax
+    push rbx    ; rbx
+    push rcx    ; rcx
+    push rdx    ; rdx
+    push rsi    ; rsi
+    push rdx    ; rdi
+    push r8     ; r8
+    push r9     ; r9
+    push r10    ; r10
+    push r11    ; r11
+    push r12    ; r12
+    push r13    ; r13
+    push r14    ; r14
+    push r15    ; r15
+
+    xchg rsi, rsp
+    ; the stack is in rsi now
+    
+    ; rax = cur_task
+    mov rax, [rel cur_task]
+    mov [rdi + TASK_FLD_PREV], rax
+    mov rdx, [rax + TASK_FLD_NEXT]
+    mov [rdi + TASK_FLD_NEXT], rdx
+    mov [rax + TASK_FLD_NEXT], rdi
+    mov [rdi + TASK_FLD_STATE], rsi
     ret
 
 asm_switch:
-    pushf
-    cli
-    push rbx
-    push rbp
-    push r12
-    push r13
-    push r14
-    push r15
-    push rdi
-    mov rdi, rsp
-    call sched_switch
-    cli
-    mov rsp, rax
-    pop rdi
-    pop r15
-    pop r14
-    pop r13
-    pop r12
-    pop rbp
-    pop rbx
-    popf
+        push rbp
+        lea rbp, [rsp]
+        pushf
+        cli
+        push rax
+        push rbx
+        push rcx
+        push rdx
+        push rsi
+        push rdi
+        push r8
+        push r9
+        push r10
+        push r11
+        push r12
+        push r13
+        push r14
+        push r15
+
+        mov rax, [rel cur_task]
+        mov [rax + TASK_FLD_STATE], rsp
+        mov rax, [rax + TASK_FLD_NEXT]
+        mov [rel cur_task], rax
+    .resume:
+        mov rax, [rel cur_task]
+        mov rsp, [rax + TASK_FLD_STATE]
+
+        pop r15
+        pop r14
+        pop r13
+        pop r12
+        pop r11
+        pop r10
+        pop r9
+        pop r8
+        pop rdi
+        pop rsi
+        pop rdx
+        pop rcx
+        pop rbx
+        pop rax
+        popf
+        pop rbp
+        ret
+
+_rdrand:
+    rdrand rax
+    jnc _rdrand
     ret
-
-; on the stack we have rdi and rip
-_taskcall_contcreat:
-    pop rdi
-    ret
-
-; This sets up a call to `rip` with the argument of `rdi` with stack at `stack`. The state necessary to resume 
-; into the newly created task is put into `their_state`
-;                 rdi           rsi           rdx
-; ulong task_call(ulong value, ulong* stack, ulong rip)
-
-task_call:
-    mov rax, rsp
-    mov rsp, rsi
-    xor rbx, rbx
-    push rdx
-    pushf
-    cli
-    push rdx ; rbx
-    push rbx ; rbp
-    push rbx ; r12
-    push rbx ; r13
-    push rbx ; r14
-    push rbx ; r15
-    push rdi ; rdi
-    xchg rax, rsp
-    ret
-
-
 
 fgdt:
     lgdt [rel GDT64.Pointer]
@@ -162,9 +210,11 @@ section .data
 %macro isrgen 1
 
 isr%1:
+    push rax
+    mov rax, [rsp + 8]
+    push rax
     push rbp
     lea rbp, [rsp]
-    push rax
     push rbx
     push rcx
     push rdx
@@ -198,8 +248,8 @@ isr%1:
     pop rdx
     pop rcx
     pop rbx
-    pop rax
     pop rbp
+    pop rax
 %if (%1 >= 0x8 && %1 <= 0xE) || %1 == 0x11 || %1 == 0x1E
     add rsp, 8 ; error code
 %endif
@@ -228,6 +278,14 @@ isrgen i
 
 section .data
 global fgdt
+
+cur_task: dq zygote
+zygote:
+    .state: dq 0
+    .prev: dq zygote
+    .next: dq zygote
+    .data: dq 0
+
 GDT64:                           ; Global Descriptor Table (64-bit).
 .Null: equ $ - GDT64         ; The null descriptor.
     dw 0xFFFF                    ; Limit (low).

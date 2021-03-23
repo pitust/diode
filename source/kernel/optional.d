@@ -7,7 +7,7 @@ unittest {
     import kernel.io : printk;
 
     printk("[optional] Create, uninited");
-    Option!int uninited = Option!(int).none();
+    Option!int uninited = Option!(int)();
     printk("[optional] is_{some,none} on `none`");
     assert(uninited.is_none());
     assert(!uninited.is_some());
@@ -18,7 +18,7 @@ unittest {
     assert(!inited.is_none());
     assert(inited.is_some());
     printk("[optional] unwrap is 3 on `Some(3)");
-    assert(3 == *inited.unwrap());
+    assert(3 == inited.unwrap());
     printk("[optional]: Some(3): {} | None: {}", inited, uninited);
 }
 

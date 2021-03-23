@@ -19,7 +19,7 @@ struct Phys {
     /// Access this phys, temporarily, mapping at least 4K of memory
     void quickmap(Args...)(void function(void*, Args) func, Args args) {
         void* addr = cast(void*) 0x0000_0800_8000_000;
-        ulong* pte_addr = *get_pte_ptr(addr).unwrap();
+        ulong* pte_addr = get_pte_ptr(addr).unwrap();
         assert(pte_addr[0] == 0);
         debug assert(pte_addr[1] == 0);
         pte_addr[0] = 0x3 | (cast(ulong) _addr & 0x000f_ffff_ffff_f000);
@@ -127,7 +127,7 @@ unittest {
     void* addr = cast(void*) 0x0000_0800_8000_000;
     long* addrl = cast(long*) addr;
     long* target = cast(long*) page();
-    ulong* pte_addr = *get_pte_ptr(addr).unwrap();
+    ulong* pte_addr = get_pte_ptr(addr).unwrap();
 
     printk("[pmap] mapping {ptr} to {ptr}", cast(ulong) target, cast(ulong) addr);
     *pte_addr = 0x3 | cast(ulong) target;

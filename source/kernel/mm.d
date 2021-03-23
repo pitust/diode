@@ -305,12 +305,12 @@ T* alloc(T)() {
     HeapBlock* hblk = cast(HeapBlock*) kalloc(size + 16);
     hblk.typeinfo = typeinfo!T();
     hblk.size = size;
-    return cast(T*)(16 + cast(ulong)hblk);
+    return cast(T*)(16 + cast(ulong) hblk);
 }
 
 /// Free memory
 void free(T)(T* value) {
-    HeapBlock* allocbase = cast(HeapBlock*)((cast(ulong)value) - 16);
+    HeapBlock* allocbase = cast(HeapBlock*)((cast(ulong) value) - 16);
     kfree(cast(void*) allocbase, allocbase.size + 16);
 }
 

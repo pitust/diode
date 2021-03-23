@@ -1,8 +1,8 @@
 module kernel.irq;
 
-import core.bitop;
 import kernel.io;
 import kernel.mm;
+import kernel.task;
 import kernel.platform;
 
 private extern (C) struct ISRFrameNOEC {
@@ -59,6 +59,18 @@ private extern (C) struct ISRFrame {
 
 /// Handle an ISR
 extern (C) void isrhandle_ec(ulong isr, ISRFrame* frame) {
+    if (isr == /* timer */ 0x20) {
+        sched_yield();
+        return;
+    }
+    if (isr == 0xe) {
+        ulong pfaddr;
+        asm {
+            mov RAX, CR3;
+            mov pfaddr, RAX;
+        }
+        printk("Page fault addr: {hex}");
+    }
     printk("ISR: {hex} code={hex}", isr, frame.error);
     printk("Frame: {hex}", frame);
     if (isr == 3) {

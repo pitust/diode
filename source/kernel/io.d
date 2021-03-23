@@ -1,6 +1,5 @@
 module kernel.io;
 
-import core.bitop;
 import core.vararg;
 import core.volatile;
 import std.traits;
@@ -35,7 +34,6 @@ void putsk(char* s) {
     }
 }
 
-
 /// putsk is a dumb version of printk (with no newline!)
 void putsk(immutable(char)[] s) {
     foreach (chr; s) {
@@ -54,7 +52,6 @@ private void putsk_string(T)(T s) {
 void putck(char c) {
     outp(DEBUG_IO_PORT, c);
 }
-
 
 /// putsk is a dumb version of printk (with no newline!)
 void putsk(T)(T s) {
@@ -295,7 +292,9 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
             }
             putsk('"');
         } else {
-            putsk(arg);
+            for (int i = 0; arg[i]; i++) {
+                putck(arg[i]);
+            }
         }
     } else static if (is(T : ArrayMarker!char)) {
         assert(subarray == "");
@@ -439,7 +438,7 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
                 putsk('{');
                 bool is_first = true;
                 static foreach (member; [__traits(allMembers, T)]) {
-                    static if (member.length > 6 && member[0..6] == "_prnt_") {
+                    static if (member.length > 6 && member[0 .. 6] == "_prnt_") {
                         if (is_first) {
                             putsk('\n');
                             for (int i = 0; i < prenest; i++) {
@@ -448,7 +447,7 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
                             is_first = false;
                         }
                         putsk("   ");
-                        putsk(member[6..member.length]);
+                        putsk(member[6 .. member.length]);
                         putsk(": ");
                         __traits(getMember, arg, member)(subarray, prenest + 1);
                         putsk('\n');
@@ -456,7 +455,8 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
                             putsk("   ");
                         }
                     } else static if (!isCallable!(__traits(getMember, arg, member))) {
-                        static if (!__traits(compiles, __traits(getMember, arg, member)._oskip) && !__traits(hasMember, arg, "__noshow_" ~ member)) {
+                        static if (!__traits(compiles, __traits(getMember, arg, member)
+                                ._oskip) && !__traits(hasMember, arg, "__noshow_" ~ member)) {
                             if (is_first) {
                                 putsk('\n');
                                 for (int i = 0; i < prenest; i++) {
@@ -474,7 +474,8 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
                                             member), prenest + 1, meta.print_raw);
                                 }
                             } else {
-                                putdyn(subarray, __traits(getMember, arg, member), prenest + 1, true);
+                                putdyn(subarray, __traits(getMember, arg,
+                                        member), prenest + 1, true);
                             }
                             putsk('\n');
                             for (int i = 0; i < prenest; i++) {

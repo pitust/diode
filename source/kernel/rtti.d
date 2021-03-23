@@ -16,7 +16,8 @@ struct TypeInfo {
     string name;
 
     /// opFormatter
-    void opFormatter(string _subarray, int _prenest) {
+    void opFormatter(string subarray, int _prenest) {
+        debug assert(subarray == "");
         putsk("[TypeInfo for ");
         putsk(name);
         putsk("]");

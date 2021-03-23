@@ -51,14 +51,7 @@ void backtrace() {
 }
 /// Reload CS
 extern (C) void reload_cs();
-private ulong _rdrand() {
-    ulong raw;
-    asm {
-        rdrand RAX;
-        mov raw, RAX;
-    }
-    return raw;
-}
+private extern(C) ulong _rdrand();
 private ulong _rdrand2() {
     ulong raw = 0;
     while (!raw) raw = _rdrand();
@@ -168,8 +161,8 @@ Option!T catch_assert(T, Args...)(T function(Args) fn, Args args) {
     Option!(jmpbuf*) _catch_assert_bak = _catch_assert;
     jmpbuf j;
     if (setjmp(&j)) {
-        _catch_assert = Option!(jmpbuf*).none();
-        return Option!(T).none();
+        _catch_assert = Option!(jmpbuf*)();
+        return Option!(T)();
     }
     _catch_assert = Option!(jmpbuf*)(&j);
     T v = fn(args);
@@ -181,7 +174,6 @@ Option!T catch_assert(T, Args...)(T function(Args) fn, Args args) {
 extern (C) void __assert(char* assertion, char* file, int line) {
 
     import kernel.io : putsk;
-    import core.bitop : outp;
     import kernel.util : intToString;
 
     putsk("Kernel assertion failed: ");
@@ -205,5 +197,41 @@ extern (C) void __assert(char* assertion, char* file, int line) {
     }
     for (;;) {
         hlt();
+    }
+}
+
+/// Get the contents of the `rflags` register
+ulong flags() {
+    ulong f;
+    asm {
+        pushf;
+        pop RAX;
+        mov f, RAX;
+    }
+    return f;
+}
+
+/// Update the contents of the `rflags` register
+void setflags(ulong flags) {
+    asm {
+        mov RAX, flags;
+        push RAX;
+        popf;
+    }
+}
+
+/// Clear the interrupts
+void cli() {
+    asm {
+        cli;
+    }
+}
+
+/// Output a byte
+void outp(ushort port, ubyte b) {
+    asm {
+        mov DX, port;
+        mov AL, b;
+        out DX, AL;
     }
 }
