@@ -87,6 +87,7 @@ void pic_eoi() {
 extern (C) void isrhandle_ec(ulong isr, ISRFrame* frame) {
     if (isr ==  /* timer */ 0x20) {
         sched_yield();
+        frame.flags |= /* IF */ 0x80;
         pic_eoi();
         return;
     }
@@ -100,6 +101,7 @@ extern (C) void isrhandle_ec(ulong isr, ISRFrame* frame) {
     }
     if (isr == 3) {
         sched_yield(frame);
+        printk("<=== {hex}", frame);
         return;
     }
     printk(ERROR, "ISR: {hex} code={hex}", isr, frame.error);
@@ -130,6 +132,7 @@ extern (C) void isrhandle_noec(ulong isr, ISRFrameNOEC* frame) {
     frame2.rcx = frame.rcx;
     frame2.rbx = frame.rbx;
     frame2.rax = frame.rax;
+    frame2.rbp = frame.rbp;
     isrhandle_ec(isr, &frame2);
     frame.rip = frame2.rip;
     frame.cs = frame2.cs;
@@ -150,6 +153,7 @@ extern (C) void isrhandle_noec(ulong isr, ISRFrameNOEC* frame) {
     frame.rcx = frame2.rcx;
     frame.rbx = frame2.rbx;
     frame.rax = frame2.rax;
+    frame.rbp = frame2.rbp;
 }
 
 /// An IDTR

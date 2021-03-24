@@ -1,7 +1,7 @@
 module kernel.task;
 
 import kernel.mm : alloc, free;
-import kernel.platform : flags, setflags, cli, setjmp, longjmp, jmpbuf, lock;
+import kernel.platform : flags, cli, setjmp, longjmp, jmpbuf, lock;
 import kernel.io;
 import kernel.irq;
 import ldc.attributes;
@@ -74,6 +74,7 @@ private extern (C) void _onothertaskdostuff(r* the_r) {
 
 /// Create a task
 void task_create(T)(void function(T*) func, T* arg, void* stack) {
+    const ulong fl = flags;
     r the_r;
     the_r.func = cast(void function(void*)) func;
     the_r.arg = cast(void*) arg;
@@ -98,6 +99,7 @@ void task_create(T)(void function(T*) func, T* arg, void* stack) {
     tidlock.unlock();
     cur_t.next = task;
     sched_yield();
+    flags = fl;
 }
 
 private ulong ncn_to_juice(ulong u) {
@@ -108,10 +110,15 @@ private ulong ncn_to_juice(ulong u) {
 void sched_yield() {
     const ulong flg = flags;
     cli();
+    ulong rsp;
     asm {
+        push RBP;
         int 3;
+        pop RBP;
+        mov rsp, RBP;
     }
-    setflags(flg);
+    printk("z {hex} {hex}", flg, rsp);
+    flags = flg;
 }
 
 /// Force a yield.
@@ -122,9 +129,11 @@ void sched_yield(ISRFrame* fr) {
         return;
     }
     ensure_task_init();
+    printk("i:: {hex}", fr.rbp);
     cur_t.state = *fr;
     cur_t = cur_t.next;
     *fr = cur_t.state;
+    printk("o:: {hex}", fr.rbp);
 }
 
 /// Fake a yield, resetting the juice. Useful after changing the niceness in the kernel.

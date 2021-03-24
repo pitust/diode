@@ -184,13 +184,13 @@ extern (C) void __assert(char* assertion, char* file, int line) {
     import kernel.io : FATAL, printk;
     import kernel.util : intToString;
 
-    ulong f = flags;
+    const ulong f = flags;
     cli();
 
     printk(FATAL, "Kernel assertion failed: {} at {}:{}", assertion, file, line);
     backtrace();
     if (_catch_assert.is_some()) {
-        setflags(f);
+        flags = f;
         longjmp(_catch_assert.unwrap(), 1);
     }
     for (;;) {
@@ -210,7 +210,7 @@ ulong flags() {
 }
 
 /// Update the contents of the `rflags` register
-void setflags(ulong flags) {
+void flags(ulong flags) {
     asm {
         mov RAX, flags;
         push RAX;

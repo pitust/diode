@@ -23,7 +23,19 @@ private __gshared ulong test_global = 1;
 
 private void test2() {
     __gshared ulong[4096] stack;
-    task_create!void((void* eh) { printk("OUR TASK!!!"); }, cast(void*) 0, (cast(void*) stack) + stack
+    task_create((void* eh) {
+        while (true) {
+            printk("T1");
+            sched_yield();
+        }
+    }, cast(void*) 0, (cast(void*) stack) + stack
+            .sizeof);
+    task_create((void* eh) {
+        while (true) {
+            printk("T2");
+            sched_yield();
+        }
+    }, cast(void*) 0, (cast(void*) stack) + stack
             .sizeof);
     printk("HEY 1!");
 }
@@ -144,10 +156,12 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
     printk("{hex}/{hex} bytes used", heap_usage, heap_max);
 
     // printk("HEY 0!");
-    // test2();
-    // printk("HEY 2!");
+    test2();
+    printk("HEY: {hex}", flags);
     // sched_yield();
     for (;;) {
+        flags = flags | 0x80;
+        printk("HEY: {hex}", flags);
         hlt();
     }
 }
