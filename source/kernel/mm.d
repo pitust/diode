@@ -305,13 +305,13 @@ private void kfree(void* value, ulong size) {
 }
 
 /// Allocate some stuff
-T* alloc(T)() {
+T* alloc(T, Args...)(Args arg) {
     const ulong size = (T.sizeof + 15) & 0xffff_ffff_ffff_fff0;
     HeapBlock* hblk = cast(HeapBlock*) kalloc(size + 16);
     hblk.typeinfo = typeinfo!T();
     hblk.size = size;
     T* a = cast(T*)(16 + cast(ulong) hblk);
-    emplace!(T)(a);
+    emplace!(T)(a, arg);
     return a;
 }
 

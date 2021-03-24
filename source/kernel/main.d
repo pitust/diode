@@ -22,20 +22,23 @@ extern (C) private void fgdt();
 private __gshared ulong test_global = 1;
 
 private void test2() {
-    __gshared ulong[4096] stack;
+    __gshared ulong[8192] stack1;
+    __gshared ulong[8192] stack2;
     task_create((void* eh) {
+        asm { sti; }
         while (true) {
-            printk("T1");
+            printk("T1 {hex}", flags);
             sched_yield();
         }
-    }, cast(void*) 0, (cast(void*) stack) + stack
+    }, cast(void*) 0, (cast(void*) stack1) + stack1
             .sizeof);
     task_create((void* eh) {
+        asm { sti; }
         while (true) {
-            printk("T2");
+            printk("T2 {hex}", flags);
             sched_yield();
         }
-    }, cast(void*) 0, (cast(void*) stack) + stack
+    }, cast(void*) 0, (cast(void*) stack2) + stack2
             .sizeof);
     printk("HEY 1!");
 }
@@ -138,9 +141,6 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
     }
 
     ensure_task_init();
-    asm {
-        sti;
-    }
     remap(0x20, 0x28);
 
     ulong* a = alloc!ulong();
@@ -155,13 +155,16 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
 
     printk("{hex}/{hex} bytes used", heap_usage, heap_max);
 
+    asm {
+        sti;
+    }
+
     // printk("HEY 0!");
     test2();
     printk("HEY: {hex}", flags);
-    // sched_yield();
+    sched_yield();
     for (;;) {
-        flags = flags | 0x80;
-        printk("HEY: {hex}", flags);
+        printk("s: {hex}", flags);
         hlt();
     }
 }

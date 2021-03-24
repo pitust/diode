@@ -85,10 +85,6 @@ struct Option(T) {
         return Option!U();
     }
 
-    invariant () {
-        assert(__invariant);
-    }
-
     ~this() {
         assert(__invariant);
         if (is_something) {

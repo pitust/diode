@@ -85,12 +85,6 @@ void pic_eoi() {
 
 /// Handle an ISR
 extern (C) void isrhandle_ec(ulong isr, ISRFrame* frame) {
-    if (isr ==  /* timer */ 0x20) {
-        sched_yield();
-        frame.flags |= /* IF */ 0x80;
-        pic_eoi();
-        return;
-    }
     if (isr == 0xe) {
         ulong pfaddr;
         asm {
@@ -99,11 +93,6 @@ extern (C) void isrhandle_ec(ulong isr, ISRFrame* frame) {
         }
         printk(ERROR, "Page fault addr: {hex}", pfaddr);
     }
-    if (isr == 3) {
-        sched_yield(frame);
-        printk("<=== {hex}", frame);
-        return;
-    }
     printk(ERROR, "ISR: {hex} code={hex}", isr, frame.error);
     printk(ERROR, "Frame: {hex}", frame);
     assert(false);
@@ -111,49 +100,16 @@ extern (C) void isrhandle_ec(ulong isr, ISRFrame* frame) {
 
 /// Handle an ISR
 extern (C) void isrhandle_noec(ulong isr, ISRFrameNOEC* frame) {
-    ISRFrame frame2;
-    frame2.rip = frame.rip;
-    frame2.cs = frame.cs;
-    frame2.flags = frame.flags;
-    frame2.rsp = frame.rsp;
-    frame2.ss = frame.ss;
-    frame2.error = 0;
-    frame2.r15 = frame.r15;
-    frame2.r14 = frame.r14;
-    frame2.r13 = frame.r13;
-    frame2.r12 = frame.r12;
-    frame2.r11 = frame.r11;
-    frame2.r10 = frame.r10;
-    frame2.r9 = frame.r9;
-    frame2.r8 = frame.r8;
-    frame2.rdi = frame.rdi;
-    frame2.rsi = frame.rsi;
-    frame2.rdx = frame.rdx;
-    frame2.rcx = frame.rcx;
-    frame2.rbx = frame.rbx;
-    frame2.rax = frame.rax;
-    frame2.rbp = frame.rbp;
-    isrhandle_ec(isr, &frame2);
-    frame.rip = frame2.rip;
-    frame.cs = frame2.cs;
-    frame.flags = frame2.flags;
-    frame.rsp = frame2.rsp;
-    frame.ss = frame2.ss;
-    frame.r15 = frame2.r15;
-    frame.r14 = frame2.r14;
-    frame.r13 = frame2.r13;
-    frame.r12 = frame2.r12;
-    frame.r11 = frame2.r11;
-    frame.r10 = frame2.r10;
-    frame.r9 = frame2.r9;
-    frame.r8 = frame2.r8;
-    frame.rdi = frame2.rdi;
-    frame.rsi = frame2.rsi;
-    frame.rdx = frame2.rdx;
-    frame.rcx = frame2.rcx;
-    frame.rbx = frame2.rbx;
-    frame.rax = frame2.rax;
-    frame.rbp = frame2.rbp;
+    // isrhandle_ec(isr, &frame2);
+    if (isr ==  /* timer */ 0x20) {
+        pic_eoi();
+        // sched_yield();
+        return;
+    }
+    printk(ERROR, "ISR: {hex}", isr);
+    printk(ERROR, "Frame: {hex}", frame);
+    assert(0);
+    
 }
 
 /// An IDTR
@@ -263,4 +219,9 @@ void remap(ubyte offset1, ubyte offset2) {
 
     outp(PIC1_DATA, 0);
     outp(PIC2_DATA, 0);
+
+    outp(0x43, 0x34);
+    outp(0x40, cast(ubyte)(2000 & 0xff));
+    outp(0x40, cast(ubyte)(2000 >> 16));
+
 }

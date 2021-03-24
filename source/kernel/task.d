@@ -6,13 +6,9 @@ import kernel.io;
 import kernel.irq;
 import ldc.attributes;
 
-private @weak T black_box(T)(T a) {
-    return a;
-}
-
 /// A `t` - a DIOS task.
 struct t {
-    private ISRFrame state;
+    private ulong[5] state;
     private ulong juice;
     private t* prev;
     private t* next;
@@ -54,86 +50,80 @@ void ensure_task_init() {
 
 private __gshared bool is_go_commit_die = false;
 
-private extern (C) void _onothertaskdostuff(r* the_r) {
-    void function(void*) func = black_box(the_r.func);
-    void* arg = black_box(the_r.arg);
-    black_box(the_r);
-    sched_yield();
+private extern (C) void task_trampoline(r* the_r) {
+    void function(void*) func = the_r.func;
+    void* arg = the_r.arg;
+    free(the_r);
+    // black_box(the_r);
+    // sched_yield();
     func(arg);
-    cli();
-    cur_t.next.prev = cur_t.prev;
-    cur_t.prev.next = cur_t.next;
-    t* nx = cur_t.next;
-    free!t(cur_t);
-    cur_t = *&nx;
-    is_go_commit_die = true;
-    asm {
-        int 3;
-    }
+    // cli();
+    // cur_t.next.prev = cur_t.prev;
+    // cur_t.prev.next = cur_t.next;
+    // t* nx = cur_t.next;
+    // free!t(cur_t);
+    // cur_t = *&nx;
+    // is_go_commit_die = true;
+    // asm {
+    //     int 3;
+    // }
+
+    assert(0);
 }
+
+private extern(C) void altstack_task_setup(void* data, ulong* target_buf);
 
 /// Create a task
 void task_create(T)(void function(T*) func, T* arg, void* stack) {
-    const ulong fl = flags;
     r the_r;
-    the_r.func = cast(void function(void*)) func;
-    the_r.arg = cast(void*) arg;
-    const r* borrow_r = &the_r;
-    ulong tgd = cast(ulong)&_onothertaskdostuff;
-    t* task = alloc!t();
-    task.juice = cur_t.juice;
-    task.niceness = cur_t.niceness;
-    task.state.rdi = cast(ulong) borrow_r;
-    task.state.rsi = 0;
-    task.state.rdx = 0;
-    task.state.rcx = 0;
-    task.state.rip = tgd;
-    task.state.cs = 0x08;
-    task.state.flags = flags;
-    task.state.rsp = cast(ulong) stack;
-    task.state.ss = 0x10;
-    task.next = cur_t.next;
-    task.prev = cur_t;
-    tidlock.lock();
-    task.tid = ++tidbase;
-    tidlock.unlock();
-    cur_t.next = task;
-    sched_yield();
-    flags = fl;
+    the_r.func = cast(void function(void*))func;
+    the_r.arg = cast(void*)arg;
+    const r* borrow_r = alloc!r(the_r);
+    void* argg = cast(void*)borrow_r;
+
+    t* the_t = alloc!(t)();
+    ulong* s = the_t.state.ptr;
+    asm {
+        mov R13, stack;
+        mov R14, s;
+        mov R15, argg;
+        xchg R13, RSP;
+        mov RDI, R15;
+        mov RSI, s;
+        call altstack_task_setup;
+        xchg R13, RSP;
+    }
+    the_t.next = cur_t.next;
+    cur_t.next.prev = the_t;
+    the_t.prev = cur_t;
+    cur_t.next = the_t;
+
+    // assert(0);
 }
 
 private ulong ncn_to_juice(ulong u) {
     return 41 - (20 + u);
 }
 
+private extern(C) void task_switch(ulong* buf);
+
+private extern(C) void task_enqueue(ulong* buf) {
+    ensure_task_init();
+    cur_t.state[0] = buf[0];
+    cur_t.state[1] = buf[1];
+    cur_t.state[2] = buf[2];
+    cur_t.state[3] = buf[3];
+    cur_t.state[4] = buf[4];
+    cur_t = cur_t.next;
+}
+
 /// Force a yield.
 void sched_yield() {
     const ulong flg = flags;
     cli();
-    ulong rsp;
-    asm {
-        push RBP;
-        int 3;
-        pop RBP;
-        mov rsp, RBP;
-    }
-    printk("z {hex} {hex}", flg, rsp);
+    task_switch(cur_t.next.state.ptr);
+    
     flags = flg;
-}
-
-/// Force a yield.
-void sched_yield(ISRFrame* fr) {
-    if (is_go_commit_die) {
-        is_go_commit_die = false;
-        *fr = cur_t.state;
-        return;
-    }
-    ensure_task_init();
-    printk("i:: {hex}", fr.rbp);
-    cur_t.state = *fr;
-    cur_t = cur_t.next;
-    *fr = cur_t.state;
-    printk("o:: {hex}", fr.rbp);
 }
 
 /// Fake a yield, resetting the juice. Useful after changing the niceness in the kernel.

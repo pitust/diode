@@ -1,13 +1,14 @@
-D_SRCS = $(shell find source -type f | grep -v '\.s$$')
+D_SRCS = $(shell find source -type f | grep -v '\.[sc]$$')
 run: build/kernel.hdd
 	qemu-system-x86_64 -hda build/kernel.hdd \
 		-s -debugcon stdio -global \
 		isa-debugcon.iobase=0x400 -cpu max
 al:
 	addr2line --exe build/kernel.elf | sponge
-build/kernel.elf: build/boot.o $(D_SRCS) linker.ld
+build/kernel.elf: build/boot.o $(D_SRCS) linker.ld source/task.c
 	find build | grep '\.o$$' | grep -v \/boot\.o | xargs rm -f
-	ldc2 -code-model=kernel -mtriple x86_64-elf -O0 --frame-pointer=all -betterC -c $(D_SRCS) -od=build -g --d-debug -mattr=-sse,-sse2,-sse3,-ssse3 
+	clang -target x86_64-elf -ffreestanding source/task.c -o build/cctask.o -c -ggdb -fno-omit-frame-pointer
+	ldc2 -code-model=kernel -mtriple x86_64-elf -O0 --frame-pointer=all -betterC -c $(D_SRCS) -od=build -g --d-debug -mattr=-sse,-sse2,-sse3,-ssse3 --disable-red-zone
 	@rm -f build/kernel.elf
 	ld.lld -m elf_x86_64 -nostdlib -T linker.ld -o build/kernel.elf build/boot.o /opt/libgcc-cross-x86_64-elf.a `find build | grep '\.o$$' | grep -v \/boot\.o` --color-diagnostics 2>&1
 	@[ -e build/kernel.elf ]

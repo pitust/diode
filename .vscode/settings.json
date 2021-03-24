@@ -1,4 +1,9 @@
 {
     "d.neverUseDub": true,
-    "d.stdlibPath": []
+    "d.stdlibPath": [],
+    "files.associations": {
+        "Tracefile": "yaml",
+        "stdint.h": "c",
+        "assert.h": "c"
+    }
 }

@@ -257,7 +257,6 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
         subarray = "";
         is_field = true;
     }
-    pragma(msg, "=> putdyn: ", typeof(arg));
     alias T = Unqual!(typeof(arg));
     static if (is(T : const char[])) {
         assert(subarray == "");
@@ -489,7 +488,6 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
             }
         }
     }
-    pragma(msg, "<= putdyn: ", typeof(arg));
 }
 
 /// Log level
@@ -529,6 +527,8 @@ private __gshared ulong lineno_max = 3;
 
 /// Print a string
 void printk(string A = __FILE__, int L = __LINE__, Args...)(Log l, string s, Args args) {
+    const ulong f = flags;
+    cli();
     ulong maxl = 4;
     putck('[');
     switch (l) {
@@ -550,6 +550,7 @@ void printk(string A = __FILE__, int L = __LINE__, Args...)(Log l, string s, Arg
         maxl = 5;
         break;
     default:
+        printk(FATAL, "Invalid level: {}", cast(int)l);
         assert(0);
     }
     putsk("\x1b[0m] ");
@@ -583,6 +584,7 @@ void printk(string A = __FILE__, int L = __LINE__, Args...)(Log l, string s, Arg
     while (idx_into_s < s.length)
         putck(s[idx_into_s++]);
     putck('\n');
+    flags = f;
 }
 
 /// Print a string

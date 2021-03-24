@@ -142,8 +142,8 @@ isr%1:
     pop rdx
     pop rcx
     pop rbx
-    pop rbp
     pop rax
+    pop rbp
 %if (%1 >= 0x8 && %1 <= 0xE) || %1 == 0x11 || %1 == 0x1E
     add rsp, 8 ; error code
 %endif
@@ -200,5 +200,5 @@ GDT64:                           ; Global Descriptor Table (64-bit).
     dq GDT64                     ; Base.
 section .bss
 stack_bottom:
-	resb 0x20000
+	resb 0x40000
 stack_top:
