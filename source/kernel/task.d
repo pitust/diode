@@ -1,23 +1,24 @@
 module kernel.task;
 
 import kernel.mm : alloc, free;
-import kernel.platform : flags, setflags, cli;
+import kernel.platform : flags, setflags, cli, setjmp, longjmp, jmpbuf, lock;
 import kernel.io;
+import kernel.irq;
+import ldc.attributes;
+private @weak T black_box(T)(T a) {
+    return a;
+}
 
 /// A `t` - a DIOS task.
 struct t {
-    private ulong state;
+    private ISRFrame state;
     private ulong juice;
+    private t* prev;
+    private t* next;
     /// The niceness value
     ulong niceness;
-}
-
-/// A `c` - the state of a dios task
-private struct c {
-    ulong state;
-    c* prev;
-    c* next;
-    t* data;
+    /// the TID
+    ulong tid;
 }
 
 /// A task creation request
@@ -26,79 +27,108 @@ private struct r {
     void* arg;
 }
 
-private extern (C) void handle_creat(r* the_r) {
-    void* arg = the_r.arg;
-    void function(void*) func = the_r.func;
-    debug (sched)
-        printk("The r: {}", the_r);
-    free!r(the_r);
-    debug (sched)
-        printk("Starting a task...");
-    sched_yield();
-    debug (sched)
-        printk("Task scheudled!");
-    func(arg);
-    asm_exit();
-
-}
-
-/// This sets up a call to `rip` with the argument of `rdi` with stack at `stack`. The state necessary to resume 
-/// into the newly created task is put into `their_state`
-private extern (C) ulong task_call(ulong rdi, void* stack, ulong rip);
-private extern (C) void asm_switch();
-private extern (C) void asm_exit();
-private extern (C) void createc(c* the_c, void* stack, ulong the_rdi, ulong the_rip);
-
 private __gshared t* cur_t;
 private __gshared t zygote_t;
+private __gshared lock tidlock;
+private __gshared ulong tidbase = 1;
 private __gshared bool is_task_inited = false;
 
-/// Deallocate a `c`
-extern (C) void dealloc_c(c* cc) {
-    free!(c)(cc);
-}
+// llvm.eh.sjlj.longjmp
+
+// llvm.eh.sjlj.setjmp
 
 /// Ensure tasks are ready
 void ensure_task_init() {
     if (!is_task_inited) {
-        debug (sched)
-            printk("Initing task structures");
+        printk("Initing task structures");
         is_task_inited = true;
         zygote_t.juice = 1;
         zygote_t.niceness = 20;
+        zygote_t.tid = 1;
+        zygote_t.next = &zygote_t;
+        zygote_t.prev = &zygote_t;
         cur_t = &zygote_t;
+    }
+}
+
+private __gshared bool is_go_commit_die = false;
+
+private extern (C) void _onothertaskdostuff(r* the_r) {
+    void function(void*) func = black_box(the_r.func);
+    void* arg = black_box(the_r.arg);
+    black_box(the_r);
+    sched_yield();
+    func(arg);
+    cli();
+    cur_t.next.prev = cur_t.prev;
+    cur_t.prev.next = cur_t.next;
+    t* nx = cur_t.next;
+    free!t(cur_t);
+    cur_t = nx;
+    is_go_commit_die = true;
+    asm {
+        int 3;
     }
 }
 
 /// Create a task
 void task_create(T)(void function(T*) func, T* arg, void* stack) {
-    ensure_task_init();
-    const ulong oldflags = flags();
-    cli();
-    t* new_t = alloc!(t)();
-    new_t.niceness = cur_t.niceness;
-
-    r* the_r = alloc!r();
+    // assert(0);
+    jmpbuf exytbuf;
+    jmpbuf insidebuf;
+    r the_r;
     the_r.func = cast(void function(void*)) func;
     the_r.arg = cast(void*) arg;
-
-    c* the_c = alloc!c();
-    // c.data = new_t;
-
-    createc(the_c, stack, cast(ulong)the_r, cast(ulong)&handle_creat);
-
+    r* borrow_r = &the_r;
+    jmpbuf* exytbufptr = &exytbuf;
+    jmpbuf* insidebufptr = &insidebuf;
+    ulong tgd = cast(ulong)&_onothertaskdostuff;
+    t* task = alloc!t();
+    task.juice = cur_t.juice;
+    task.niceness = cur_t.niceness;
+    task.state.rdi = cast(ulong)borrow_r;
+    task.state.rsi = 0;
+    task.state.rdx = 0;
+    task.state.rcx = 0;
+    task.state.rip = tgd;
+    task.state.cs = 0x08;
+    task.state.flags = flags;
+    task.state.rsp = cast(ulong)stack;
+    task.state.ss = 0x10;
+    task.next = cur_t.next;
+    task.prev = cur_t;
+    tidlock.lock();
+    task.tid = ++tidbase;
+    tidlock.unlock();
+    cur_t.next = task;
     sched_yield();
-    setflags(oldflags);
 }
 
 private ulong ncn_to_juice(ulong u) {
     return 41 - (20 + u);
 }
 
-
 /// Force a yield.
 void sched_yield() {
-    asm_switch();
+    const ulong flg = flags;
+    cli();
+    asm {
+        int 3;
+    }
+    setflags(flg);
+}
+
+/// Force a yield.
+void sched_yield(ISRFrame* fr) {
+    if (is_go_commit_die) {
+        is_go_commit_die = false;
+        *fr = cur_t.state;
+        return;
+    }
+    ensure_task_init();
+    cur_t.state = *fr;
+    cur_t = cur_t.next;
+    *fr = cur_t.state;
 }
 
 /// Fake a yield, resetting the juice. Useful after changing the niceness in the kernel.

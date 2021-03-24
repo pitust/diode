@@ -1,6 +1,7 @@
 module kernel.platform;
 
 import kernel.optional;
+import ldc.attributes;
 
 /// A nothing
 struct nothing {
@@ -25,7 +26,7 @@ bool intr() {
 }
 
 /// The I/O port mapped to QEMU's stdout
-public const DEBUG_IO_PORT = 0x400;
+public const DEBUG_IO_PORT_NUM = 0x400;
 
 private extern (C) struct Stackframe {
     Stackframe* rbp;
@@ -37,15 +38,16 @@ void backtrace() {
     asm {
         mov stk, RBP;
     }
-    import kernel.io : printk;
+    import kernel.io : printk, FATAL;
 
-    printk("Stack trace:\n");
+    printk(FATAL, "Stack trace:");
     for (;;) {
         // Unwind to previous stack frame
-        printk("  {ptr}", stk.rip);
+        printk(FATAL, "  {ptr}", stk.rip);
         if (stk.rbp == cast(Stackframe*) 0 || stk.rip == 0)
             break;
         if (stk.rip < 0xffffffff80000000) break;
+        if ((cast(ulong)stk.rbp) < 0xffffffff80000000) break;
         stk = stk.rbp;
     }
 }
@@ -123,7 +125,7 @@ ulong atomic_xchg(ulong* target, ulong val) {
 }
 
 /// A lock!
-struct Lock {
+struct lock {
     private ulong l = 0;
     /// Grab a lock
     void lock() {
@@ -149,11 +151,16 @@ struct jmpbuf {
     private ulong rsi;
 }
 
+
 /// Set Jump
-extern (C) ulong setjmp(jmpbuf* buf);
+extern (C)
+@(llvmAttr("returns-twice"))
+ulong setjmp(jmpbuf* buf);
 
 /// Long Jump
-extern (C) void longjmp(jmpbuf* buf, ulong value);
+extern (C) 
+@(llvmAttr("noreturn"))
+void longjmp(jmpbuf* buf, ulong value);
 private __gshared Option!(jmpbuf*) _catch_assert = Option!(jmpbuf*)();
 
 /// Catch assertions from `fn`
@@ -173,26 +180,16 @@ Option!T catch_assert(T, Args...)(T function(Args) fn, Args args) {
 /// Internal assetion code
 extern (C) void __assert(char* assertion, char* file, int line) {
 
-    import kernel.io : putsk;
+    import kernel.io : FATAL, printk;
     import kernel.util : intToString;
 
-    putsk("Kernel assertion failed: ");
-    for (int i = 0; assertion[i] != 0; i++) {
-        outp(DEBUG_IO_PORT, assertion[i]);
-    }
-    putsk(" at ");
-    for (int i = 0; file[i] != 0; i++) {
-        outp(DEBUG_IO_PORT, file[i]);
-    }
-    outp(DEBUG_IO_PORT, ':');
-    char[70] buf;
-    char* ptr = intToString(line, buf.ptr, 10);
-    for (int i = 0; ptr[i] != 0; i++) {
-        outp(DEBUG_IO_PORT, ptr[i]);
-    }
-    outp(DEBUG_IO_PORT, '\n');
+    ulong f = flags;
+    cli();
+
+    printk(FATAL, "Kernel assertion failed: {} at {}:{}", assertion, file, line);
     backtrace();
     if (_catch_assert.is_some()) {
+        setflags(f);
         longjmp(_catch_assert.unwrap(), 1);
     }
     for (;;) {

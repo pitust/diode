@@ -49,10 +49,31 @@ extern (C) struct MemoryMapEntry {
 extern (C) struct TagMemoryMap {
     /// the tag struct
     align(8) Tag tag;
-    /// The memory map size
-    align(8) ulong size;
-    /// The memory map itself
-    align(8) MemoryMapEntry[0x10000] entries;
+    //// Amount of entries
+    align(8) ulong entcount;
+    /// The memory map entries
+    align(8) MemoryMapEntry[0x1000] entries;
+
+}
+
+/// A module
+extern(C) struct Module {
+    ///
+    ulong begin;
+    ///
+    ulong end;
+    ///
+    char[128] name;
+}
+
+/// Memory map stivale2 tag
+extern (C) struct TagModules {
+    /// the tag struct
+    align(8) Tag tag;
+    /// Amount of modules
+    align(8) ulong modulecount;
+    /// Modules
+    align(8) Module[0x8] modules;
 
 }
 

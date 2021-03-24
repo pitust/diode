@@ -4,6 +4,7 @@ import kernel.io;
 import kernel.mm;
 import kernel.task;
 import kernel.platform;
+import kernel.task : sched_yield;
 
 private extern (C) struct ISRFrameNOEC {
     ulong r15;
@@ -23,44 +24,70 @@ private extern (C) struct ISRFrameNOEC {
     ulong rbp;
     // ulong error;
 
-    ulong ip;
+    ulong rip;
     ulong cs;
     ulong flags;
-    ulong sp;
+    ulong rsp;
     ulong ss;
 }
 
-private extern (C) struct ISRFrame {
+///
+extern (C) struct ISRFrame {
+    /// The value of the register `r15`
     ulong r15;
+    /// The value of the register `r14`
     ulong r14;
+    /// The value of the register `r13`
     ulong r13;
+    /// The value of the register `r12`
     ulong r12;
+    /// The value of the register `r11`
     ulong r11;
+    /// The value of the register `r10`
     ulong r10;
+    /// The value of the register `r9`
     ulong r9;
+    /// The value of the register `r8`
     ulong r8;
+    /// The value of the register `rdi`
     ulong rdi;
+    /// The value of the register `rsi`
     ulong rsi;
+    /// The value of the register `rdx`
     ulong rdx;
+    /// The value of the register `rcx`
     ulong rcx;
+    /// The value of the register `rbx`
     ulong rbx;
+    /// The value of the register `rax`
     ulong rax;
+    /// The value of the register `rbp`
     ulong rbp;
-
+    /// The value of the register `error`
     ulong error;
-
-    ulong ip;
+    /// The value of the register `rip`
+    ulong rip;
+    /// The value of the register `cs`
     ulong cs;
+    /// The value of the register `flags`
     ulong flags;
-    ulong sp;
+    /// The value of the register `rsp`
+    ulong rsp;
+    /// The value of the register `ss`
     ulong ss;
 
+}
+
+/// Acknowledge end of interrupt on the legacy PIC.
+void pic_eoi() {
+    outp(0x20, 0x20);
 }
 
 /// Handle an ISR
 extern (C) void isrhandle_ec(ulong isr, ISRFrame* frame) {
     if (isr == /* timer */ 0x20) {
         sched_yield();
+        pic_eoi();
         return;
     }
     if (isr == 0xe) {
@@ -69,23 +96,24 @@ extern (C) void isrhandle_ec(ulong isr, ISRFrame* frame) {
             mov RAX, CR3;
             mov pfaddr, RAX;
         }
-        printk("Page fault addr: {hex}");
+        printk(ERROR, "Page fault addr: {hex}", pfaddr);
     }
-    printk("ISR: {hex} code={hex}", isr, frame.error);
-    printk("Frame: {hex}", frame);
     if (isr == 3) {
+        sched_yield(frame);
         return;
     }
+    printk(ERROR, "ISR: {hex} code={hex}", isr, frame.error);
+    printk(ERROR, "Frame: {hex}", frame);
     assert(false);
 }
 
 /// Handle an ISR
 extern (C) void isrhandle_noec(ulong isr, ISRFrameNOEC* frame) {
     ISRFrame frame2;
-    frame2.ip = frame.ip;
+    frame2.rip = frame.rip;
     frame2.cs = frame.cs;
     frame2.flags = frame.flags;
-    frame2.sp = frame.sp;
+    frame2.rsp = frame.rsp;
     frame2.ss = frame.ss;
     frame2.error = 0;
     frame2.r15 = frame.r15;
@@ -103,6 +131,25 @@ extern (C) void isrhandle_noec(ulong isr, ISRFrameNOEC* frame) {
     frame2.rbx = frame.rbx;
     frame2.rax = frame.rax;
     isrhandle_ec(isr, &frame2);
+    frame.rip = frame2.rip;
+    frame.cs = frame2.cs;
+    frame.flags = frame2.flags;
+    frame.rsp = frame2.rsp;
+    frame.ss = frame2.ss;
+    frame.r15 = frame2.r15;
+    frame.r14 = frame2.r14;
+    frame.r13 = frame2.r13;
+    frame.r12 = frame2.r12;
+    frame.r11 = frame2.r11;
+    frame.r10 = frame2.r10;
+    frame.r9 = frame2.r9;
+    frame.r8 = frame2.r8;
+    frame.rdi = frame2.rdi;
+    frame.rsi = frame2.rsi;
+    frame.rdx = frame2.rdx;
+    frame.rcx = frame2.rcx;
+    frame.rbx = frame2.rbx;
+    frame.rax = frame2.rax;
 }
 
 /// An IDTR

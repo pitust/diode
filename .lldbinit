@@ -1,0 +1,3 @@
+target create build/kernel.elf
+gdb-remote 1234
+settings set target.x86-disassembly-flavor intel

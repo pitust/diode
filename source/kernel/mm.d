@@ -220,10 +220,15 @@ Option!(void*) mmIsHeap(void* a) {
     if (value > poolsize) {
         return O();
     }
-    const ulong vs4 = value >> 4;
+    ulong vs4 = (value >> 4) - 1;
     debug assert((*aps.val()).get_bitmap_offset_at(vs4 >> 14, vs4 & 0x3fff,
             apsdims), "Kernel: dangling pointer passed to `mmIsHeap`");
     ulong nego = 0;
+    vs4 += 1;
+    if (!(*aps.val()).get_bitmap_offset_at(vs4 >> 14, vs4 & 0x3fff,
+            apsdims)) {
+        return O(a);
+    }
     while (true) {
         debug assert((*aps.val()).get_bitmap_offset_at((vs4 - nego) >> 14,
                 (vs4 - nego) & 0x3fff, apsdims));
@@ -250,7 +255,7 @@ private void* kalloc(ulong size) {
     const ulong ss = size >> 4;
     while (true) {
         for (int i = 0; i < MM_ATTEMPTS_RFALLOC; i++) {
-            const ulong rand = (rdweakrandom() % poolsize) & ~0xf;
+            const ulong rand = (rdweakrandom() % (poolsize - size)) & ~0xf;
             bool success = true;
             for (ulong j = 0; j < ss; j++) {
                 const ulong v = j + (rand >> 4);
@@ -305,13 +310,125 @@ T* alloc(T)() {
     HeapBlock* hblk = cast(HeapBlock*) kalloc(size + 16);
     hblk.typeinfo = typeinfo!T();
     hblk.size = size;
-    return cast(T*)(16 + cast(ulong) hblk);
+    T* a = cast(T*)(16 + cast(ulong) hblk);
+    emplace!(T)(a);
+    return a;
+}
+
+private U transmute(T, U)(T a) {
+    struct L {
+        T v;
+    }
+
+    struct R {
+        U v;
+    }
+
+    L l;
+    l.v = a;
+    return (cast(R*)&l).v;
+}
+
+private ulong storage_for_arr(T)(ulong n) {
+    return ((T.sizeof * n) + 15) & 0xffff_ffff_ffff_fff0;
+}
+
+private T[] alloca_unsafe(T)(ulong n) {
+    const ulong size = storage_for_arr!T(n);
+    HeapBlock* hblk = cast(HeapBlock*) kalloc(size + 16);
+    hblk.typeinfo = typeinfo!(T[])();
+    hblk.size = size;
+    memset(16 + cast(byte*) hblk, 0, size);
+    T* hh = cast(T*)(16 + cast(ulong) hblk);
+    struct fake_t {
+        size_t length;
+        T* ptr;
+    }
+
+    fake_t fake;
+    fake.length = n;
+    fake.ptr = hh;
+    return transmute!(fake_t, T[])(fake);
+}
+
+/// Allocate a dynamically-sized array of `n` elements
+T[] alloca(T)(ulong n) {
+    T[] oa = alloca_unsafe!T(n);
+    foreach (i; 0 .. n) {
+        emplace(&oa[i]);
+    }
+    return oa;
+}
+
+private T max(T)(T a, T b) {
+    if (a < b) return b;
+    return a;
+}
+
+/// Allocate a dynamically-sized array of `n` elements
+void push(T)(ref T[] arr, T e) {
+    T[] newa = arr;
+    bool skipalloc = false;
+    if (mmIsHeap(cast(void*)arr.ptr).is_some()) {
+        HeapBlock* hb = mmGetHeapBlock(cast(void*)arr.ptr).unwrap();
+        if (hb.size >= storage_for_arr!(T)(arr.length + 1)) {
+            skipalloc = true;
+        }
+    }
+    ulong oldlen = arr.length;
+    if (!skipalloc) {
+        newa = alloca_unsafe!T(max(arr.length * 2, arr.length + 1));
+        foreach (i; 0 .. arr.length) {
+            emplace(&newa[i], arr[i]);
+        }
+        free(arr);
+    }
+    // HACK: manipulating the internal repr of an array is questionable
+    (cast(ulong*)&arr)[0] = oldlen + 1;
+    (cast(ulong*)&arr)[1] = cast(ulong) newa.ptr;
+    emplace(&arr[oldlen], e);
+}
+
+/// Allocate a dynamically-sized array of `n` elements
+T[] realloca(T)(T[] old, ulong n) {
+    if (n < old.length) {
+        printk(DEBUG, "Choosing shrink fast-path for realloca");
+        ulong sa = (((cast(ulong) old.ptr) - poolbase) + T.sizeof * n) >> 4;
+        const ulong downsizeChunks = ((n - old.length) * T.sizeof) >> 4;
+        foreach (i; 0 .. downsizeChunks) {
+            const ulong v = sa + i;
+            (*aps.val()).set_bitmap_offset_at(v >> 14, v & 0x3fff, apsdims, false);
+        }
+    } else if (n == old.length) {
+        printk(WARN, "realloca: you should totally not call realloca with garbage");
+        return old;
+    }
+    // TODO: expand fast path
+
+    T[] newa = alloca_unsafe!T(n);
+    foreach (i; 0 .. n) {
+        if (i < old.length) {
+            emplace(&newa[i], old[i]);
+        } else {
+            emplace(&newa[i]);
+        }
+    }
+    free(old);
+    return newa;
 }
 
 /// Free memory
 void free(T)(T* value) {
     HeapBlock* allocbase = cast(HeapBlock*)((cast(ulong) value) - 16);
     kfree(cast(void*) allocbase, allocbase.size + 16);
+}
+
+/// Free memory
+void free(T)(T[] value) {
+    if (mmGetHeapBlock(cast(void*) value.ptr).is_some()) {
+        HeapBlock* allocbase = cast(HeapBlock*)((cast(ulong) value.ptr) - 16);
+        kfree(cast(void*) allocbase, allocbase.size + 16);
+    }
 }
 
 /// A refernce value

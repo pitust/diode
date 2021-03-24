@@ -46,7 +46,6 @@ rdrandom:
     ret
 
 global asm_switch
-global asm_exit
 global setjmp
 global longjmp
 global _D4core5bitop4outpFNbNikkZh
@@ -80,108 +79,6 @@ longjmp:
     mov    r15, [rdi + 40]
     ret
 
-extern dealloc_c
-
-asm_exit:
-    ; cur = [cur_task]
-    mov rax, [rel cur_task]
-    ; cur->prev->next = cur->next
-
-    ; rbx = cur->prev
-    mov rbx, [rax + TASK_FLD_PREV]
-    ; rcx = cur->next
-    mov rcx, [rax + TASK_FLD_NEXT]
-    ; cur->prev (rbx)->next = cur->next (rcx)
-    mov [rbx + TASK_FLD_NEXT], rcx
-    mov rdi, rax
-    call dealloc_c
-    jmp asm_switch.resume
-
-global createc
-;              rdi       rsi          rdx            rcx
-; void createc(c* the_c, void* stack, ulong the_rdi, ulong the_rip)
-createc:
-    cli
-    xchg rsi, rsp
-
-    push rcx ; rip
-    push rbp
-    lea rbp, [rsp]
-    pushf
-    cli
-    push rax    ; rax
-    push rbx    ; rbx
-    push rcx    ; rcx
-    push rdx    ; rdx
-    push rsi    ; rsi
-    push rdx    ; rdi
-    push r8     ; r8
-    push r9     ; r9
-    push r10    ; r10
-    push r11    ; r11
-    push r12    ; r12
-    push r13    ; r13
-    push r14    ; r14
-    push r15    ; r15
-
-    xchg rsi, rsp
-    ; the stack is in rsi now
-    
-    ; rax = cur_task
-    mov rax, [rel cur_task]
-    mov [rdi + TASK_FLD_PREV], rax
-    mov rdx, [rax + TASK_FLD_NEXT]
-    mov [rdi + TASK_FLD_NEXT], rdx
-    mov [rax + TASK_FLD_NEXT], rdi
-    mov [rdi + TASK_FLD_STATE], rsi
-    ret
-
-asm_switch:
-        push rbp
-        lea rbp, [rsp]
-        pushf
-        cli
-        push rax
-        push rbx
-        push rcx
-        push rdx
-        push rsi
-        push rdi
-        push r8
-        push r9
-        push r10
-        push r11
-        push r12
-        push r13
-        push r14
-        push r15
-
-        mov rax, [rel cur_task]
-        mov [rax + TASK_FLD_STATE], rsp
-        mov rax, [rax + TASK_FLD_NEXT]
-        mov [rel cur_task], rax
-    .resume:
-        mov rax, [rel cur_task]
-        mov rsp, [rax + TASK_FLD_STATE]
-
-        pop r15
-        pop r14
-        pop r13
-        pop r12
-        pop r11
-        pop r10
-        pop r9
-        pop r8
-        pop rdi
-        pop rsi
-        pop rdx
-        pop rcx
-        pop rbx
-        pop rax
-        popf
-        pop rbp
-        ret
-
 _rdrand:
     rdrand rax
     jnc _rdrand
@@ -210,11 +107,8 @@ section .data
 %macro isrgen 1
 
 isr%1:
-    push rax
-    mov rax, [rsp + 8]
-    push rax
     push rbp
-    lea rbp, [rsp]
+    push rax
     push rbx
     push rcx
     push rdx
@@ -278,13 +172,6 @@ isrgen i
 
 section .data
 global fgdt
-
-cur_task: dq zygote
-zygote:
-    .state: dq 0
-    .prev: dq zygote
-    .next: dq zygote
-    .data: dq 0
 
 GDT64:                           ; Global Descriptor Table (64-bit).
 .Null: equ $ - GDT64         ; The null descriptor.

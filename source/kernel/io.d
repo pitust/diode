@@ -14,7 +14,7 @@ void putsk_const_str(const(string) s) {
     foreach (chr; s) {
         if (chr == 0)
             break;
-        outp(DEBUG_IO_PORT, chr);
+        putck(chr);
     }
 }
 
@@ -23,47 +23,48 @@ void putsk_const_str(string s) {
     foreach (chr; s) {
         if (chr == 0)
             break;
-        outp(DEBUG_IO_PORT, chr);
+        putck(chr);
     }
 }
 
 /// putsk is a dumb version of printk (with no newline!)
 void putsk(char* s) {
     for (int i = 0; s[i] != 0; i++) {
-        outp(DEBUG_IO_PORT, s[i]);
+        putck(s[i]);
     }
 }
 
 /// putsk is a dumb version of printk (with no newline!)
 void putsk(immutable(char)[] s) {
     foreach (chr; s) {
-        outp(DEBUG_IO_PORT, chr);
+        putck(chr);
     }
 }
 
 /// putsk is a dumb version of printk (with no newline!)
 private void putsk_string(T)(T s) {
     foreach (chr; s) {
-        outp(DEBUG_IO_PORT, chr);
+        putck(chr);
     }
 }
 
 /// putck prints a char (cough cough outp(DEBUG_IO_PORT, chr) cough)
 void putck(char c) {
-    outp(DEBUG_IO_PORT, c);
+    if (c != 0)
+        outp(DEBUG_IO_PORT_NUM, c);
 }
 
 /// putsk is a dumb version of printk (with no newline!)
 void putsk(T)(T s) {
     static assert(is(Unqual!(T) : ArrayMarker!char));
     foreach (char chr; s) {
-        outp(DEBUG_IO_PORT, chr);
+        putck(chr);
     }
 }
 
 /// putsk is a dumb version of printk (with no newline!)
 void putsk(char s) {
-    outp(DEBUG_IO_PORT, s);
+    putck(s);
 }
 
 private struct ArrayMarker(T) {
@@ -358,17 +359,17 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
             if (is_first) {
                 putsk('\n');
                 for (int i = 0; i < prenest; i++) {
-                    putsk("   ");
+                    putsk(" ");
                 }
                 is_first = false;
             }
-            putsk("   ");
+            putsk("    ");
             {
-                putdyn("", member, prenest + 1, true);
+                putdyn("", member, prenest + 4, true);
             }
             putsk('\n');
             for (int i = 0; i < prenest; i++) {
-                putsk("   ");
+                putsk(" ");
             }
         }
         putsk(']');
@@ -382,24 +383,24 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
                 putsk("   ... snip");
                 putsk('\n');
                 for (int i = 0; i < prenest; i++) {
-                    putsk("   ");
+                    putsk(" ");
                 }
                 break;
             }
             if (is_first) {
                 putsk('\n');
                 for (int i = 0; i < prenest; i++) {
-                    putsk("   ");
+                    putsk(" ");
                 }
                 is_first = false;
             }
-            putsk("   ");
+            putsk("    ");
             {
-                putdyn("", member, prenest + 1, true);
+                putdyn(subarray, member, prenest + 4, true);
             }
             putsk('\n');
             for (int i = 0; i < prenest; i++) {
-                putsk("   ");
+                putsk(" ");
             }
         }
         putsk(']');
@@ -442,17 +443,17 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
                         if (is_first) {
                             putsk('\n');
                             for (int i = 0; i < prenest; i++) {
-                                putsk("   ");
+                                putsk(">");
                             }
                             is_first = false;
                         }
-                        putsk("   ");
+                        putsk("    ");
                         putsk(member[6 .. member.length]);
                         putsk(": ");
-                        __traits(getMember, arg, member)(subarray, prenest + 1);
+                        __traits(getMember, arg, member)(subarray, prenest + 4);
                         putsk('\n');
                         for (int i = 0; i < prenest; i++) {
-                            putsk("   ");
+                            putsk(" ");
                         }
                     } else static if (!isCallable!(__traits(getMember, arg, member))) {
                         static if (!__traits(compiles, __traits(getMember, arg, member)
@@ -460,26 +461,26 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
                             if (is_first) {
                                 putsk('\n');
                                 for (int i = 0; i < prenest; i++) {
-                                    putsk("   ");
+                                    putsk(" ");
                                 }
                                 is_first = false;
                             }
-                            putsk("   ");
+                            putsk("    ");
                             putsk(member);
                             putsk(": ");
                             static if (mixin(HasOMeta!(member))) {
                                 {
                                     mixin(GetOMeta!(member));
                                     putdyn(meta.fmt, __traits(getMember, arg,
-                                            member), prenest + 1, meta.print_raw);
+                                            member), prenest + 4, meta.print_raw);
                                 }
                             } else {
                                 putdyn(subarray, __traits(getMember, arg,
-                                        member), prenest + 1, true);
+                                        member), prenest + 4, true);
                             }
                             putsk('\n');
                             for (int i = 0; i < prenest; i++) {
-                                putsk("   ");
+                                putsk(" ");
                             }
                         }
                     }
@@ -491,22 +492,100 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
     pragma(msg, "<= putdyn: ", typeof(arg));
 }
 
+/// Log level
+enum Log {
+    DEBUG,
+    INFO,
+    WARN,
+    ERROR,
+    FATAL,
+}
+
+/// Debug
+public const Log DEBUG = Log.DEBUG;
+/// Info
+public const Log INFO = Log.INFO;
+/// Warn
+public const Log WARN = Log.WARN;
+/// Error
+public const Log ERROR = Log.ERROR;
+/// Fatal
+public const Log FATAL = Log.FATAL;
+
+private template Digit(uint n) {
+    public __gshared enum char[] Digit = [("0123456789"[n .. n + 1])[0]];
+}
+
+private template Itoa(uint n) {
+    static if (n < 0)
+        public __gshared const char[] Itoa = "-" ~ Itoa!(-n);
+    else static if (n < 10)
+        public __gshared const char[] Itoa = Digit!(n);
+    else
+        public __gshared const char[] Itoa = Itoa!(n / 10) ~ Digit!(n % 10);
+}
+
+private __gshared ulong lineno_max = 3;
+
 /// Print a string
-void printk(Args...)(string s, Args args) {
+void printk(string A = __FILE__, int L = __LINE__, Args...)(Log l, string s, Args args) {
+    ulong maxl = 4;
+    putck('[');
+    switch (l) {
+    case DEBUG:
+        putsk("\x1b[30;1mDEBUG");
+        break;
+    case INFO:
+        putsk("\x1b[32;1mINFO");
+        break;
+    case WARN:
+        putsk("\x1b[33;1mWARN");
+        break;
+    case ERROR:
+        putsk("\x1b[31;1mERROR");
+        maxl = 5;
+        break;
+    case FATAL:
+        putsk("\x1b[31;1mFATAL");
+        maxl = 5;
+        break;
+    default:
+        assert(0);
+    }
+    putsk("\x1b[0m] ");
+    putsk_string(A[7 .. A.length]);
+    putsk(":");
+    const(char[]) asds = Itoa!L;
+    foreach (c; asds) {
+        putck(c);
+    }
+    putck(' ');
+    if (lineno_max < asds.length)
+        lineno_max = asds.length;
+    for (ulong i = asds.length; i < lineno_max; i++)
+        putck(' ');
+
+    int offinit = cast(int)(lineno_max + A.length - 2 + maxl);
+
     int idx_into_s = 0;
     foreach (arg; args) {
 
         // advance s
         while (s[idx_into_s] != '{')
-            outp(DEBUG_IO_PORT, s[idx_into_s++]);
+            putck(s[idx_into_s++]);
         const int og_idx = idx_into_s + 1;
         while (s[idx_into_s++] != '}') {
         }
         const string subarray = s[og_idx .. idx_into_s - 1];
 
-        putdyn(subarray, arg);
+        putdyn(subarray, arg, offinit);
     }
     while (idx_into_s < s.length)
-        outp(DEBUG_IO_PORT, s[idx_into_s++]);
-    outp(DEBUG_IO_PORT, '\n');
+        putck(s[idx_into_s++]);
+    putck('\n');
+}
+
+/// Print a string
+void printk(string A = __FILE__, int L = __LINE__, Args...)(string s, Args args) {
+    printk!(A, L, Args)(INFO, s, args);
 }

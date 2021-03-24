@@ -26,6 +26,7 @@ private void test2() {
     task_create!void((void* eh) {
         printk("OUR TASK!!!");
     }, cast(void*)0, (cast(void*)stack) + stack.sizeof);
+    printk("HEY 1!");
 }
 
 private void test1(void* a) {
@@ -58,15 +59,18 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
     foreach (Tag* t; PtrTransformIter!Tag(info.tag0, function Tag* (Tag* e) {
             return e.next;
         })) {
-
+        if (t.ident.inner == 0x968609d7af96b845) {
+            printk(" - Display EDID");
+        }
         if (t.ident.inner == 0xe5e76a1b4597a781) {
             printk(" - Kernel Command Line: {:?}", (cast(TagCommandLine*) t).cmdline);
         }
         if (t.ident.inner == 0x2187f79e8612de07) {
             printk(" - Memory Map");
             TagMemoryMap* mmap = cast(TagMemoryMap*) t;
-            for (int i = 0; i < mmap.size; i++) {
-                const MemoryMapEntry ent = mmap.entries[i];
+            int i = 0;
+            foreach (MemoryMapEntry ent; mmap.entries) {
+                if (i++ >= mmap.entcount) break;
                 if (ent.type != 1)
                     continue;
                 ulong start = ent.base;
@@ -84,8 +88,15 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
             printk(" - Framebuffer");
         if (t.ident.inner == 0x6bc1a78ebe871172)
             printk(" - FB MTRR");
-        if (t.ident.inner == 0x4b6fe466aade04ce)
+        if (t.ident.inner == 0x4b6fe466aade04ce) {
             printk(" - Modules");
+            TagModules* m = cast(TagModules*)t;
+            assert(m.modulecount <= 8);
+            foreach (i; 0..m.modulecount) {
+                Module mm = m.modules[i];
+                printk("Module: {}", mm.name);
+            }
+        }
         if (t.ident.inner == 0x9e1786930a375e78)
             printk(" - RSDP");
         if (t.ident.inner == 0x566a7bed888e1407)
@@ -116,8 +127,7 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
 
     ensure_task_init();
     asm {
-        int 3;
-        sti;
+        // sti;
     }
     remap(0x20, 0x28);
     
@@ -133,7 +143,10 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
 
     printk("{hex}/{hex} bytes used", heap_usage, heap_max);
 
-    test2();
+    // printk("HEY 0!");
+    // test2();
+    // printk("HEY 2!");
+    // sched_yield();
     for (;;) {
         hlt();
     }

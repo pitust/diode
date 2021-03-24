@@ -85,7 +85,7 @@ struct Option(T) {
         return Option!U();
     }
 
-    invariant() {
+    invariant () {
         assert(__invariant);
     }
 
