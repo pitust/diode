@@ -64,7 +64,7 @@ private extern (C) void _onothertaskdostuff(r* the_r) {
     cur_t.prev.next = cur_t.next;
     t* nx = cur_t.next;
     free!t(cur_t);
-    cur_t = nx;
+    cur_t = *&nx;
     is_go_commit_die = true;
     asm {
         int 3;
@@ -73,15 +73,10 @@ private extern (C) void _onothertaskdostuff(r* the_r) {
 
 /// Create a task
 void task_create(T)(void function(T*) func, T* arg, void* stack) {
-    // assert(0);
-    jmpbuf exytbuf;
-    jmpbuf insidebuf;
     r the_r;
     the_r.func = cast(void function(void*)) func;
     the_r.arg = cast(void*) arg;
-    r* borrow_r = &the_r;
-    jmpbuf* exytbufptr = &exytbuf;
-    jmpbuf* insidebufptr = &insidebuf;
+    const r* borrow_r = &the_r;
     ulong tgd = cast(ulong)&_onothertaskdostuff;
     t* task = alloc!t();
     task.juice = cur_t.juice;
