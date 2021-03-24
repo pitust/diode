@@ -5,6 +5,7 @@ import kernel.platform : flags, setflags, cli, setjmp, longjmp, jmpbuf, lock;
 import kernel.io;
 import kernel.irq;
 import ldc.attributes;
+
 private @weak T black_box(T)(T a) {
     return a;
 }
@@ -81,14 +82,14 @@ void task_create(T)(void function(T*) func, T* arg, void* stack) {
     t* task = alloc!t();
     task.juice = cur_t.juice;
     task.niceness = cur_t.niceness;
-    task.state.rdi = cast(ulong)borrow_r;
+    task.state.rdi = cast(ulong) borrow_r;
     task.state.rsi = 0;
     task.state.rdx = 0;
     task.state.rcx = 0;
     task.state.rip = tgd;
     task.state.cs = 0x08;
     task.state.flags = flags;
-    task.state.rsp = cast(ulong)stack;
+    task.state.rsp = cast(ulong) stack;
     task.state.ss = 0x10;
     task.next = cur_t.next;
     task.prev = cur_t;

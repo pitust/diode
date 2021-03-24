@@ -361,7 +361,8 @@ T[] alloca(T)(ulong n) {
 }
 
 private T max(T)(T a, T b) {
-    if (a < b) return b;
+    if (a < b)
+        return b;
     return a;
 }
 
@@ -369,8 +370,8 @@ private T max(T)(T a, T b) {
 void push(T)(ref T[] arr, T e) {
     T[] newa = arr;
     bool skipalloc = false;
-    if (mmIsHeap(cast(void*)arr.ptr).is_some()) {
-        HeapBlock* hb = mmGetHeapBlock(cast(void*)arr.ptr).unwrap();
+    if (mmIsHeap(cast(void*) arr.ptr).is_some()) {
+        HeapBlock* hb = mmGetHeapBlock(cast(void*) arr.ptr).unwrap();
         if (hb.size >= storage_for_arr!(T)(arr.length + 1)) {
             skipalloc = true;
         }
@@ -383,7 +384,7 @@ void push(T)(ref T[] arr, T e) {
         }
         free(arr);
     }
-    // HACK: manipulating the internal repr of an array is questionable
+    // HACK: manipulating the internal repr of an array is questionable at best
     (cast(ulong*)&arr)[0] = oldlen + 1;
     (cast(ulong*)&arr)[1] = cast(ulong) newa.ptr;
     emplace(&arr[oldlen], e);

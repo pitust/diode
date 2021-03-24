@@ -85,7 +85,7 @@ void pic_eoi() {
 
 /// Handle an ISR
 extern (C) void isrhandle_ec(ulong isr, ISRFrame* frame) {
-    if (isr == /* timer */ 0x20) {
+    if (isr ==  /* timer */ 0x20) {
         sched_yield();
         pic_eoi();
         return;

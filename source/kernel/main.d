@@ -23,9 +23,8 @@ private __gshared ulong test_global = 1;
 
 private void test2() {
     __gshared ulong[4096] stack;
-    task_create!void((void* eh) {
-        printk("OUR TASK!!!");
-    }, cast(void*)0, (cast(void*)stack) + stack.sizeof);
+    task_create!void((void* eh) { printk("OUR TASK!!!"); }, cast(void*) 0, (cast(void*) stack) + stack
+            .sizeof);
     printk("HEY 1!");
 }
 
@@ -50,9 +49,9 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
         mov RAX, 0xdeadbeefdeadbeef;
         mov [RBX], RAX;
     }
-    
+
     fgdt();
-    
+
     printk("Hello, {}!", "world");
 
     printk("Thank {} for blessing our ~flight~ operating system", info.brand);
@@ -70,7 +69,8 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
             TagMemoryMap* mmap = cast(TagMemoryMap*) t;
             int i = 0;
             foreach (MemoryMapEntry ent; mmap.entries) {
-                if (i++ >= mmap.entcount) break;
+                if (i++ >= mmap.entcount)
+                    break;
                 if (ent.type != 1)
                     continue;
                 ulong start = ent.base;
@@ -90,9 +90,9 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
             printk(" - FB MTRR");
         if (t.ident.inner == 0x4b6fe466aade04ce) {
             printk(" - Modules");
-            TagModules* m = cast(TagModules*)t;
+            TagModules* m = cast(TagModules*) t;
             assert(m.modulecount <= 8);
-            foreach (i; 0..m.modulecount) {
+            foreach (i; 0 .. m.modulecount) {
                 Module mm = m.modules[i];
                 printk("Module: {}", mm.name);
             }
@@ -127,10 +127,10 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
 
     ensure_task_init();
     asm {
-        // sti;
+        sti;
     }
     remap(0x20, 0x28);
-    
+
     ulong* a = alloc!ulong();
     *a = 1234;
     test1(cast(void*) a);

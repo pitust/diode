@@ -57,7 +57,7 @@ extern (C) struct TagMemoryMap {
 }
 
 /// A module
-extern(C) struct Module {
+extern (C) struct Module {
     ///
     ulong begin;
     ///

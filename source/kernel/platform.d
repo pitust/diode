@@ -46,17 +46,20 @@ void backtrace() {
         printk(FATAL, "  {ptr}", stk.rip);
         if (stk.rbp == cast(Stackframe*) 0 || stk.rip == 0)
             break;
-        if (stk.rip < 0xffffffff80000000) break;
-        if ((cast(ulong)stk.rbp) < 0xffffffff80000000) break;
+        if (stk.rip < 0xffffffff80000000)
+            break;
+        if ((cast(ulong) stk.rbp) < 0xffffffff80000000)
+            break;
         stk = stk.rbp;
     }
 }
 /// Reload CS
 extern (C) void reload_cs();
-private extern(C) ulong _rdrand();
+private extern (C) ulong _rdrand();
 private ulong _rdrand2() {
     ulong raw = 0;
-    while (!raw) raw = _rdrand();
+    while (!raw)
+        raw = _rdrand();
     return raw;
 }
 /// Get a random number
@@ -65,6 +68,7 @@ ulong rdrandom() {
     const ulong hi = _rdrand2();
     return (lo >> 32) | (hi & 0xffff_ffff_0000_0000);
 }
+
 private __gshared ulong seed = 0;
 private __gshared ulong bk2 = 0;
 private __gshared ulong step = 63;
@@ -83,7 +87,7 @@ uint rdshortweakrandom() {
 }
 /// Get a (cryptographicaly shit) random number
 ulong rdweakrandom() {
-    return (cast(ulong)rdshortweakrandom()) | ((cast(ulong)rdshortweakrandom()) << 32);
+    return (cast(ulong) rdshortweakrandom()) | ((cast(ulong) rdshortweakrandom()) << 32);
 }
 
 extern (C) private __gshared int kend;
@@ -151,15 +155,12 @@ struct jmpbuf {
     private ulong rsi;
 }
 
-
 /// Set Jump
-extern (C)
-@(llvmAttr("returns-twice"))
+extern (C) @(llvmAttr("returns-twice"))
 ulong setjmp(jmpbuf* buf);
 
 /// Long Jump
-extern (C) 
-@(llvmAttr("noreturn"))
+extern (C) @(llvmAttr("noreturn"))
 void longjmp(jmpbuf* buf, ulong value);
 private __gshared Option!(jmpbuf*) _catch_assert = Option!(jmpbuf*)();
 

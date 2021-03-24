@@ -158,7 +158,7 @@ struct PtrRange(T) {
         this.end = len;
     }
 
-    invariant() {
+    invariant () {
         // There is a bug if begin is greater than end
         assert(begin <= end);
     }
@@ -183,7 +183,6 @@ struct PtrRange(T) {
     }
 }
 
-
 /// An iterator based on pointer transforms
 struct PtrTransformIter(T) {
     private T* function(T*) transformer;
@@ -199,7 +198,7 @@ struct PtrTransformIter(T) {
     /// Is it empty?
     bool empty() const {
         // The range is consumed when begin equals end
-        return this.data == cast(T*)0;
+        return this.data == cast(T*) 0;
     }
 
     /// Next element pls
@@ -211,7 +210,7 @@ struct PtrTransformIter(T) {
 
     /// First element ptr (reborrowed)
     T* front() const {
-        return cast(T*)this.data;
+        return cast(T*) this.data;
     }
 }
 
@@ -246,12 +245,12 @@ extern (C) int memcmp(const byte* s1, const byte* s2, size_t n) {
 /// The strlen() function calculates the length of the string pointed to by s, excluding the terminating null byte ('\0').
 ///
 /// The strlen() function returns the number of bytes in the string pointed to by s.
-extern(C) size_t strlen(const char* s) {
+extern (C) size_t strlen(const char* s) {
     size_t i = 0;
-    for (;s[i] != 0;i++) {}
+    for (; s[i] != 0; i++) {
+    }
     return i;
 }
-
 
 /// memcpy - copy memory area
 ///
@@ -260,15 +259,26 @@ extern(C) size_t strlen(const char* s) {
 /// areas do overlap.
 ///
 /// The memcpy() function returns a pointer to dest.
-extern(C) byte* memcpy(byte* dst, const byte* src, size_t n) {
+extern (C) byte* memcpy(byte* dst, const byte* src, size_t n) {
     size_t i = 0;
-    while (i + 8 <= n) { *(cast(ulong*)(&dst[i])) = *(cast(ulong*)(&src[i])); i += 8; }
-    while (i + 4 <= n) { *(cast(uint*)(&dst[i])) = *(cast(uint*)(&src[i])); i += 4; }
-    while (i + 2 <= n) { *(cast(ushort*)(&dst[i])) = *(cast(ushort*)(&src[i])); i += 2; }
-    while (i + 1 <= n) { *(cast(byte*)(&dst[i])) = *(cast(byte*)(&src[i])); i += 1; }
+    while (i + 8 <= n) {
+        *(cast(ulong*)(&dst[i])) = *(cast(ulong*)(&src[i]));
+        i += 8;
+    }
+    while (i + 4 <= n) {
+        *(cast(uint*)(&dst[i])) = *(cast(uint*)(&src[i]));
+        i += 4;
+    }
+    while (i + 2 <= n) {
+        *(cast(ushort*)(&dst[i])) = *(cast(ushort*)(&src[i]));
+        i += 2;
+    }
+    while (i + 1 <= n) {
+        *(cast(byte*)(&dst[i])) = *(cast(byte*)(&src[i]));
+        i += 1;
+    }
     return dst;
 }
-
 
 /// memset - fill memory with a constant byte
 ///
@@ -276,7 +286,8 @@ extern(C) byte* memcpy(byte* dst, const byte* src, size_t n) {
 /// area pointed to by mem with the constant byte data.
 ///
 /// The memset() function returns a pointer to the memory area mem.
-extern(C) byte* memset(byte* mem, byte data, size_t len) {
-    for (size_t i = 0;i < len;i++) mem[i] = data;
+extern (C) byte* memset(byte* mem, byte data, size_t len) {
+    for (size_t i = 0; i < len; i++)
+        mem[i] = data;
     return mem;
 }
