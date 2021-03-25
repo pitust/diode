@@ -198,7 +198,7 @@ user_branch:
 
     push rax
     push rsi
-    push 0
+    push 0x200
     push rdx
     push rdi
     iretq

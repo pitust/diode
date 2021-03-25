@@ -14,7 +14,7 @@ al:
 build/kernel.elf: build/boot.o $(D_SRCS) linker.ld source/task.c
 	find build | grep '\.o$$' | grep -v \/boot\.o | xargs rm -f
 	clang -target x86_64-elf -ffreestanding source/task.c -o build/cctask.o -c -ggdb -fno-omit-frame-pointer
-	ldc2 --float-abi=soft -code-model=kernel -mtriple x86_64-elf -O0 --frame-pointer=all -betterC -c $(D_SRCS) -od=build -g --d-debug -mattr=-sse,-sse2,-sse3,-ssse3 --disable-red-zone
+	ldc2 --makedeps -v --float-abi=soft -code-model=kernel -mtriple x86_64-linux -O0 --frame-pointer=all -betterC -c $(D_SRCS) -od=build -g --d-debug -mattr=-sse,-sse2,-sse3,-ssse3 --disable-red-zone
 	@rm -f build/kernel.elf
 	ld.lld -m elf_x86_64 -nostdlib -T linker.ld -o build/kernel.elf build/boot.o /opt/libgcc-cross-x86_64-elf.a `find build | grep '\.o$$' | grep -v \/boot\.o` --color-diagnostics 2>&1
 	@[ -e build/kernel.elf ]

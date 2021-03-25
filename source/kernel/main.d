@@ -1,18 +1,19 @@
 module kernel.main;
 
-import core.volatile;
 import core.bitop;
-import kernel.platform;
+import core.volatile;
 import kernel.io;
-import kernel.util;
-import kernel.irq;
-import kernel.stivale;
-import kernel.pmap;
-import kernel.rtti;
-import kernel.refptr;
 import kernel.mm;
-import kernel.guards;
+import kernel.irq;
+import kernel.pmap;
+import kernel.port;
 import kernel.task;
+import kernel.rtti;
+import kernel.util;
+import kernel.refptr;
+import kernel.guards;
+import kernel.stivale;
+import kernel.platform;
 import kernel.optional;
 
 unittest {
@@ -212,19 +213,30 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
     }
     cli();
     const void* arr = page();
-    // void* tgd = cast(void*)(0x0000_0004_f000_0000);
+    void* tgd = cast(void*)(0x0000_0004_f000_0000);
 
-    // *get_pte_ptr(tgd).unwrap() = 7 | cast(ulong)arr;
-    // flush_tlb();
+    *get_pte_ptr(tgd).unwrap() = 7 | cast(ulong)arr;
+    flush_tlb();
+
+    // Port* p = alloc!(Port)();
+    // {
+    //     PortRights r = PortRights(p, PortRightsKind.RECV);
+    //     PortRights s = PortRights(p, PortRightsKind.SEND);
+    //     byte[3] arra = [0, 1, 2];
+    //     byte[] outpt;
+    //     printk("result: {}", s.send(0, arra));
+    //     printk("result: {}", r.recv(outpt));
+    //     printk("out: {}", outpt);
+    // }
 
     // jmp $
-    // auto g = no_smap();
-    // *(cast(ushort*)tgd) = 0xfeeb;
-    // printk("Mappings are in! ({hex})", cast(ulong*)tgd);
-    // g.die();
-    // printk("Branching to {}", tgd);
+    auto g = no_smap();
+    *(cast(ushort*)tgd) = 0xfeeb;
+    printk("Mappings are in! ({hex})", cast(ulong*)tgd);
+    g.die();
+    printk("Branching to {}", tgd);
 
-    // user_branch(cast(ulong)tgd, alloc_stack());
+    user_branch(cast(ulong)tgd, cast(void*)0);
 
     for (;;) {
         // the kernel idle task comes here

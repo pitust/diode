@@ -68,6 +68,9 @@ void putsk(char s) {
     putck(s);
 }
 
+private struct EnumMarker {
+    
+}
 private struct ArrayMarker(T) {
 }
 
@@ -84,6 +87,15 @@ extern (C) struct Hex(T) {
     }
 }
 
+private template isEnum(alias symb)
+{
+    static if (is(symb == enum))
+        enum bool isEnum = true;
+    else
+        enum bool isEnum = false;
+}
+
+
 private template Unqual(T) {
     static if (is(T U == shared(const U)))
         alias Unqual = U;
@@ -99,7 +111,9 @@ private template Unqual(T) {
         alias Unqual = IOIterMarker!(ReturnType!(__traits(getMember, T, "ioiter")));
     else static if (isArray!(T)) {
         alias Unqual = ArrayMarker!(typeof(T.init[0]));
-    } else
+    } else static if (isEnum!(T))
+        alias Unqual = EnumMarker;
+    else
         alias Unqual = T;
 }
 
@@ -277,6 +291,31 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
         } else {
             putsk_string(arg);
         }
+    } static if (is(T == EnumMarker)) {
+        static foreach (k; __traits(allMembers, ObjTy)) {
+            {
+                if (__traits(getMember, ObjTy, k) == arg) {
+                    putsk_string(k);
+                    return;
+                }
+            }
+        }
+        // it's a bitfield
+        putck('[');
+        bool do_space = true;
+        static foreach (k; __traits(allMembers, ObjTy)) {
+            {
+                if (__traits(getMember, ObjTy, k) & arg) {
+                    if (do_space) {
+                        do_space = false;
+                        putck(' ');
+                    }
+                    putsk_string(k);
+                    putck(' ');
+                }
+            }
+        }
+        putck(']');
     } else static if (is(T : const char*)) {
         assert(subarray == "");
         if (is_field) {
