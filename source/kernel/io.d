@@ -50,8 +50,9 @@ private void putsk_string(T)(T s) {
 
 /// putck prints a char (cough cough outp(DEBUG_IO_PORT, chr) cough)
 void putck(char c) {
-    if (c != 0)
+    if (c != 0) {
         outp(DEBUG_IO_PORT_NUM, c);
+    }
 }
 
 /// putsk is a dumb version of printk (with no newline!)

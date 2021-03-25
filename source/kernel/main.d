@@ -21,6 +21,11 @@ extern (C) private void fgdt();
 
 private __gshared ulong test_global = 1;
 
+private extern(C) void load_tss();
+private extern(C) ulong gettss();
+private extern(C) ulong* gettssgdt();
+private extern(C) ulong gettssgdtid();
+
 private void test2() {
     __gshared ulong[8192] stack1;
     __gshared ulong[8192] stack2;
@@ -28,7 +33,6 @@ private void test2() {
         asm { sti; }
         while (true) {
             printk("T1 {hex}", flags);
-            sched_yield();
         }
     }, cast(void*) 0, (cast(void*) stack1) + stack1
             .sizeof);
@@ -36,7 +40,6 @@ private void test2() {
         asm { sti; }
         while (true) {
             printk("T2 {hex}", flags);
-            sched_yield();
         }
     }, cast(void*) 0, (cast(void*) stack2) + stack2
             .sizeof);
@@ -57,6 +60,10 @@ private void test1(void* a) {
         printk("test1: as a ulong, it's {}", *maybe_ulong.unwrap());
     }
 }
+
+private ulong bits(ulong shiftup, ulong shiftdown, ulong mask, ulong val) {
+    return ((val >> (shiftdown - mask)) & ((1 << mask) - 1)) << shiftup;
+} 
 
 pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
     asm {
@@ -156,16 +163,30 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
     printk("{hex}/{hex} bytes used", heap_usage, heap_max);
 
     asm {
-        sti;
+        // sti;
     }
 
     // printk("HEY 0!");
-    test2();
-    printk("HEY: {hex}", flags);
-    sched_yield();
+    // test2();
+    asm {
+        
+    }
+    printk("eh: {hex}", bits(4, 16, 4, 0xffff3dad));
+    const ulong ptr = gettss;
+
+    gettssgdt[0] = bits(16, 24, 24, ptr) | bits(56, 32, 8, ptr) | (103 & 0xff) | (0b1001UL << 40);
+    gettssgdt[1] = ptr >> 32;
+    printk("L: {hex}", gettssgdt[0]);
+    printk("L: {hex}", gettssgdt[1]);
+    assert(gettssgdtid == 0x28, "Unable to load it in");
+    fgdt();
+    printk("Fun GDT in!");
+    load_tss();
+
+
     for (;;) {
-        printk("s: {hex}", flags);
-        hlt();
+        // the kernel idle task comes here
+        sched_yield();
     }
 }
 

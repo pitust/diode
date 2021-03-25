@@ -170,6 +170,36 @@ isrgen i
 %assign i i+1
 %endrep
 
+global setrsp0
+global getrsp0
+global gettss
+global gettssgdt
+global gettssgdtid
+global load_tss
+
+load_tss:
+    mov ax, 0x28
+    ltr ax
+    ret
+setrsp0:
+    mov [rel TSS.tss_rsp0], rdi
+    ret
+getrsp0:
+    mov rax, [rel TSS.tss_rsp0]
+    ret
+
+gettss:
+    lea rax, [rel TSS]
+    ret
+
+gettssgdt:
+    lea rax, [rel GDT64.TSSE]
+    ret
+gettssgdtid:
+    mov rax, GDT64.TSS
+    ret
+
+
 section .data
 global fgdt
 
@@ -195,10 +225,63 @@ GDT64:                           ; Global Descriptor Table (64-bit).
     db 10010010b                 ; Access (read/write).
     db 00000000b                 ; Granularity.
     db 0                         ; Base (high).
+
+
+.UserCode: equ $ - GDT64         ; The code descriptor.
+    dw 0                         ; Limit (low).
+    dw 0                         ; Base (low).
+    db 0                         ; Base (middle)
+    db 11111010b                 ; Access (exec/read).
+    db 10101111b                 ; Granularity, 64 bits flag, limit19:16.
+    db 0                         ; Base (high).
+.UserData: equ $ - GDT64         ; The data descriptor.
+    dw 0                         ; Limit (low).
+    dw 0                         ; Base (low).
+    db 0                         ; Base (middle)
+    db 11110010b                 ; Access (read/write).
+    db 00000000b                 ; Granularity.
+    db 0                         ; Base (high).
+.TSS: equ $ - GDT64
+.TSSE:
+    times 16 db 0
+
+
 .Pointer:                    ; The GDT-pointer.
     dw $ - GDT64 - 1             ; Limit.
     dq GDT64                     ; Base.
+
+
+TSS: 
+    dd 0 ; 0x00 reserved
+.tss_rsp0:
+    dd 0 ; 0x04 RSP0 (low)
+    dd 0 ; 0x08 RSP0 (high)
+    dd 0 ; 0x0C RSP1 (low)
+    dd 0 ; 0x10 RSP1 (high)
+    dd 0 ; 0x14 RSP2 (low)
+    dd 0 ; 0x18 RSP2 (high)
+    dd 0 ; 0x1C reserved
+    dd 0 ; 0x20 reserved
+.ist1:
+    dq death_stack_top ; 0x24 IST1
+    dq 0 ; 0x2C IST2
+    dq 0 ; 0x34 IST3
+    dq 0 ; 0x3C IST4
+    dq 0 ; 0x44 IST5
+    dq 0 ; 0x4C IST6
+    dq 0 ; 0x54 IST7
+    dd 0 ; 0x5C reserved
+    dd 0 ; 0x60 reserved
+    dw 0 ; 0x64 reserved
+    dw 13 ; 0x66 IOPB offset
+
+    times 16-13 db 0 ; pad
+
 section .bss
+
 stack_bottom:
 	resb 0x40000
 stack_top:
+death_stack_bottom:
+	resb 0x40000
+death_stack_top:

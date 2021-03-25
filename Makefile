@@ -3,8 +3,10 @@ run: build/kernel.hdd
 	qemu-system-x86_64 -hda build/kernel.hdd \
 		-s -debugcon stdio -global \
 		isa-debugcon.iobase=0x400 -cpu max
+bochs: build/kernel.hdd
+	bochs
 al:
-	addr2line --exe build/kernel.elf | sponge
+	/opt/homebrew/Cellar/binutils/2.36.1/bin/addr2line --exe build/kernel.elf | sponge
 build/kernel.elf: build/boot.o $(D_SRCS) linker.ld source/task.c
 	find build | grep '\.o$$' | grep -v \/boot\.o | xargs rm -f
 	clang -target x86_64-elf -ffreestanding source/task.c -o build/cctask.o -c -ggdb -fno-omit-frame-pointer

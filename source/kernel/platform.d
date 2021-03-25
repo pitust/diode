@@ -26,7 +26,7 @@ bool intr() {
 }
 
 /// The I/O port mapped to QEMU's stdout
-public const DEBUG_IO_PORT_NUM = 0x400;
+public const DEBUG_IO_PORT_NUM = 0xe9;
 
 private extern (C) struct Stackframe {
     Stackframe* rbp;
@@ -216,6 +216,20 @@ void flags(ulong flags) {
         push RAX;
         popf;
     }
+}
+private extern(C) ulong getrsp0();
+private extern(C) void setrsp0(ulong v);
+
+/// Get the contents of `rsp0`
+ulong rsp0() {
+    
+    return getrsp0();
+}
+
+/// Update the contents of `rsp0`
+void rsp0(ulong rsp0nv) {
+    
+    setrsp0(rsp0nv);
 }
 
 /// Clear the interrupts

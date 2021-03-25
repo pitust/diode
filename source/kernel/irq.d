@@ -103,7 +103,11 @@ extern (C) void isrhandle_noec(ulong isr, ISRFrameNOEC* frame) {
     // isrhandle_ec(isr, &frame2);
     if (isr ==  /* timer */ 0x20) {
         pic_eoi();
-        // sched_yield();
+        sched_yield();
+        return;
+    }
+    if (isr ==  /* parallel port */ 0x27) {
+        pic_eoi();
         return;
     }
     printk(ERROR, "ISR: {hex}", isr);
@@ -217,11 +221,11 @@ void remap(ubyte offset1, ubyte offset2) {
     outp(PIC1_DATA, ICW4_8086);
     outp(PIC2_DATA, ICW4_8086);
 
-    outp(PIC1_DATA, 0);
-    outp(PIC2_DATA, 0);
+    outp(PIC1_DATA, cast(ubyte)~0b0000_0101);
+    outp(PIC2_DATA, cast(ubyte)~0b0000_0000);
 
     outp(0x43, 0x34);
-    outp(0x40, cast(ubyte)(2000 & 0xff));
-    outp(0x40, cast(ubyte)(2000 >> 16));
+    outp(0x40, cast(ubyte)(300 & 0xff));
+    outp(0x40, cast(ubyte)(300 >> 16));
 
 }

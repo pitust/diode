@@ -2,6 +2,10 @@
 This is the home of diodeOS, a kernel (and in the future userland) with the goal of not crashing and getting to userland (and also posix compliance)
 
 ## Todo
- - [ ] fix that task switcher crash bug
+ - [x] fix that task switcher crash bug
  - [ ] userland
+ - [ ] syscall
+ - [ ] vfs
+ - [ ] initrd parsing
+ - [ ] fs
  - [ ] posix compliance
