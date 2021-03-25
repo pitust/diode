@@ -9,7 +9,9 @@ import kernel.irq;
 import kernel.stivale;
 import kernel.pmap;
 import kernel.rtti;
+import kernel.refptr;
 import kernel.mm;
+import kernel.guards;
 import kernel.task;
 import kernel.optional;
 
@@ -77,6 +79,7 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
     printk("Hello, {}!", "world");
 
     printk("Thank {} for blessing our ~flight~ operating system", info.brand);
+    TagModules* m;
     foreach (Tag* t; PtrTransformIter!Tag(info.tag0, function Tag* (Tag* e) {
             return e.next;
         })) {
@@ -112,12 +115,7 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
             printk(" - FB MTRR");
         if (t.ident.inner == 0x4b6fe466aade04ce) {
             printk(" - Modules");
-            TagModules* m = cast(TagModules*) t;
-            assert(m.modulecount <= 8);
-            foreach (i; 0 .. m.modulecount) {
-                Module mm = m.modules[i];
-                printk("Module: {}", mm.name);
-            }
+            m = cast(TagModules*) t;
         }
         if (t.ident.inner == 0x9e1786930a375e78)
             printk(" - RSDP");
@@ -129,6 +127,10 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
             printk(" - Symmetric Multiprocessing Information");
         if (t.ident.inner == 0x29d1e96239247032)
             printk(" - PXE Boot Server Information");
+    }
+
+    if (m) {
+        printk("Modules: ");
     }
 
     paging_fixups();
@@ -174,15 +176,55 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
     printk("eh: {hex}", bits(4, 16, 4, 0xffff3dad));
     const ulong ptr = gettss;
 
-    gettssgdt[0] = bits(16, 24, 24, ptr) | bits(56, 32, 8, ptr) | (103 & 0xff) | (0b1001UL << 40);
+    gettssgdt[0] = bits(16, 24, 24, ptr) | bits(56, 32, 8, ptr) | (103 & 0xff) | (0b1001UL << 40) | (1UL << 47);
     gettssgdt[1] = ptr >> 32;
     printk("L: {hex}", gettssgdt[0]);
     printk("L: {hex}", gettssgdt[1]);
     assert(gettssgdtid == 0x28, "Unable to load it in");
     fgdt();
-    printk("Fun GDT in!");
     load_tss();
+    rsp0 = alloc_stack();
+    ist1 = alloc_stack();
+    printk("Fun RSP0/IST1 in!");
+    wrmsr(IA32_EFER, rdmsr(IA32_EFER) | IA32_EFER_SCE);
+    wrmsr(IA32_LSTAR, cast(ulong)&platform_sc);
+    wrmsr(IA32_STAR, cast(ulong)(0x0000_1b10) << 32);
+    wrmsr(IA32_SFMASK, /* IF */ 0x200);
+    printk("SCE in!");
+    uint outp;
+    asm {
+        mov EAX, 7;
+        mov ECX, 0;
+        cpuid;
+        mov outp, EBX;
+    }
+    printk(DEBUG, "cpuid leaf (7, 0) = {hex}", outp);
+    printk(DEBUG, "cpuid leaf (7, 0) & (1 << 20) = {hex}", outp & (1 << 20));
+    if (outp & (1 << 20)) {
+        asm {
+            mov RAX, CR4;
+            or RAX, 3 << 20;
+            mov CR4, RAX;
+        }
+        printk("SMAP/SMEP is enabled!");
+    } else {
+        printk(WARN, "SMAP is not available on your machine");
+    }
+    cli();
+    const void* arr = page();
+    // void* tgd = cast(void*)(0x0000_0004_f000_0000);
 
+    // *get_pte_ptr(tgd).unwrap() = 7 | cast(ulong)arr;
+    // flush_tlb();
+
+    // jmp $
+    // auto g = no_smap();
+    // *(cast(ushort*)tgd) = 0xfeeb;
+    // printk("Mappings are in! ({hex})", cast(ulong*)tgd);
+    // g.die();
+    // printk("Branching to {}", tgd);
+
+    // user_branch(cast(ulong)tgd, alloc_stack());
 
     for (;;) {
         // the kernel idle task comes here

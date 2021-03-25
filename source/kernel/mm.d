@@ -3,7 +3,7 @@ module kernel.mm;
 import kernel.autoinit;
 import kernel.optional;
 import kernel.io;
-import kernel.platform : rdweakrandom;
+import kernel.platform : rdweakrandom, rdrandom;
 import kernel.util : memset;
 import kernel.pmap : Phys, get_pte_ptr;
 import kernel.rtti;
@@ -164,8 +164,31 @@ private __gshared AutoInit!(RFAllocPageState*) aps = AutoInit!(RFAllocPageState*
 private __gshared ulong apsdims = 0;
 
 private __gshared ulong poolsize = 0;
+private __gshared ulong stackbase = 0xffff_8100_0000_0000;
 private const ulong poolbase = 0xffff_800f_f000_0000;
 private const ulong MM_ATTEMPTS_RFALLOC = 3000;
+
+/// Allocate a userland virtual address
+void* alloc_user_virt() {
+    return cast(void*)(rdrandom() & 0x000_0fff_ffff_0000);
+}
+
+/// Allocate a stack
+void* alloc_stack() {
+    ulong base = stackbase;
+    stackbase += 0x5000;
+    foreach (i; 0..4) {
+        void* page = page();
+        ulong* a = get_pte_ptr(cast(void*)(base + (i << 12))).unwrap();
+        *a = 3 | cast(ulong)page;
+    }
+    return cast(void*)(base + 0x4000);
+}
+
+/// Free a stack
+void free_stack(void* a) {
+
+}
 
 private void increase_apsdims() {
     apsdims += 1;
@@ -333,7 +356,8 @@ private ulong storage_for_arr(T)(ulong n) {
     return ((T.sizeof * n) + 15) & 0xffff_ffff_ffff_fff0;
 }
 
-private T[] alloca_unsafe(T)(ulong n) {
+/// Unsafe alloca, needs a memcpy
+T[] alloca_unsafe(T)(ulong n) {
     const ulong size = storage_for_arr!T(n);
     HeapBlock* hblk = cast(HeapBlock*) kalloc(size + 16);
     hblk.typeinfo = typeinfo!(T[])();
@@ -349,6 +373,11 @@ private T[] alloca_unsafe(T)(ulong n) {
     fake.length = n;
     fake.ptr = hh;
     return transmute!(fake_t, T[])(fake);
+}
+
+/// Allocate a dynamically-sized array of 0 elements
+T[] alloca(T)() {
+    return alloca_unsafe!T(0);
 }
 
 /// Allocate a dynamically-sized array of `n` elements
@@ -429,37 +458,5 @@ void free(T)(T[] value) {
     if (mmGetHeapBlock(cast(void*) value.ptr).is_some()) {
         HeapBlock* allocbase = cast(HeapBlock*)((cast(ulong) value.ptr) - 16);
         kfree(cast(void*) allocbase, allocbase.size + 16);
-    }
-}
-
-/// A refernce value
-struct RefValue(T) {
-    private MMRefValue!(T)* val;
-
-    /// The refcounted value itself!
-    T* data() {
-        return &val.value;
-    }
-
-    /// Regular ctor
-    this(T value) {
-        this.val = alloc();
-        this.val.value = value;
-    }
-
-    /// Copy ctor
-    this(ref RefValue!(T)* rhs) {
-        import kernel.platform : atomic_sub;
-
-        atomic_add(&this.val.refcount, 1);
-    }
-
-    ~this() {
-        import kernel.platform : atomic_sub;
-
-        atomic_sub(&this.val.refcount, 1);
-        if (this.val.refcount == 0) {
-            free(this.val);
-        }
     }
 }

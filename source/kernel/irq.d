@@ -88,7 +88,7 @@ extern (C) void isrhandle_ec(ulong isr, ISRFrame* frame) {
     if (isr == 0xe) {
         ulong pfaddr;
         asm {
-            mov RAX, CR3;
+            mov RAX, CR2;
             mov pfaddr, RAX;
         }
         printk(ERROR, "Page fault addr: {hex}", pfaddr);
@@ -107,6 +107,7 @@ extern (C) void isrhandle_noec(ulong isr, ISRFrameNOEC* frame) {
         return;
     }
     if (isr ==  /* parallel port */ 0x27) {
+        putck('?');
         pic_eoi();
         return;
     }
@@ -174,6 +175,7 @@ IDTR new_idtr() {
     const ulong* targets = get_idt_targets();
     foreach (i; 0 .. 256) {
         idt[i].addr = targets[i];
+        idt[i].ist = 1;
     }
     idtr.addr = cast(ulong) idt.ptr;
     idtr.size = 4096;

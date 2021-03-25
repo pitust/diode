@@ -17,7 +17,7 @@ struct Phys {
     private ulong _addr;
 
     /// Access this phys, temporarily, mapping at least 4K of memory
-    void quickmap(Args...)(void function(void*, Args) func, Args args) {
+    void quickmap(T, Args...)(void function(T*, Args) func, Args args) {
         void* addr = cast(void*) 0x0000_0800_8000_000;
         ulong* pte_addr = get_pte_ptr(addr).unwrap();
         assert(pte_addr[0] == 0);
@@ -25,7 +25,7 @@ struct Phys {
         pte_addr[0] = 0x3 | (cast(ulong) _addr & 0x000f_ffff_ffff_f000);
         pte_addr[1] = 0x3 | (cast(ulong)(_addr + 0x1000) & 0x000f_ffff_ffff_f000);
         flush_tlb();
-        func(addr + (_addr & 0x1ff), args);
+        func(cast(T*)(addr + (_addr & 0x1ff)), args);
         *pte_addr = 0;
         flush_tlb();
     }
@@ -56,7 +56,8 @@ struct Phys {
     }
 }
 
-private void flush_tlb() {
+/// Flush the TLB
+void flush_tlb() {
     asm {
         mov RAX, CR3;
         mov CR3, RAX;
@@ -106,7 +107,7 @@ Option!(ulong*) get_pte_ptr(void* va) {
             debug printk("Paving a new memory page, index {hex} into PTE at {}, paving {}",
                     key, &page_table[key], new_page_table);
             memset(cast(byte*) new_page_table, 0, 4096);
-            page_table[key] = 0x3 | cast(ulong) new_page_table;
+            page_table[key] = 0x7 | cast(ulong) new_page_table;
         }
         control_pte = &page_table[key];
         page_table = cast(ulong*)(page_table[key] & 0x000f_ffff_ffff_f000);

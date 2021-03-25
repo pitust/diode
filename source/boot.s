@@ -171,11 +171,40 @@ isrgen i
 %endrep
 
 global setrsp0
+global setist1
 global getrsp0
 global gettss
 global gettssgdt
 global gettssgdtid
 global load_tss
+global platform_sc
+global user_branch
+global _stac
+global _clac
+_stac:
+    stac
+    ret
+_clac:
+    clac
+    ret
+
+user_branch:
+    mov rdx, 0x18 | 3
+    mov ax, 0x23 | 3
+    mov ds,ax
+    mov es,ax 
+    mov fs,ax 
+    mov gs,ax
+
+    push rax
+    push rsi
+    push 0
+    push rdx
+    push rdi
+    iretq
+
+platform_sc:
+    db 0xeb, 0xfe
 
 load_tss:
     mov ax, 0x28
@@ -183,6 +212,9 @@ load_tss:
     ret
 setrsp0:
     mov [rel TSS.tss_rsp0], rdi
+    ret
+setist1:
+    mov [rel TSS.ist1], rdi
     ret
 getrsp0:
     mov rax, [rel TSS.tss_rsp0]
@@ -202,6 +234,7 @@ gettssgdtid:
 
 section .data
 global fgdt
+align 16
 
 GDT64:                           ; Global Descriptor Table (64-bit).
 .Null: equ $ - GDT64         ; The null descriptor.
@@ -212,35 +245,13 @@ GDT64:                           ; Global Descriptor Table (64-bit).
     db 1                         ; Granularity.
     db 0                         ; Base (high).
 .Code: equ $ - GDT64         ; The code descriptor.
-    dw 0                         ; Limit (low).
-    dw 0                         ; Base (low).
-    db 0                         ; Base (middle)
-    db 10011010b                 ; Access (exec/read).
-    db 10101111b                 ; Granularity, 64 bits flag, limit19:16.
-    db 0                         ; Base (high).
+    dq 0x00af9b000000ffff
 .Data: equ $ - GDT64         ; The data descriptor.
-    dw 0                         ; Limit (low).
-    dw 0                         ; Base (low).
-    db 0                         ; Base (middle)
-    db 10010010b                 ; Access (read/write).
-    db 00000000b                 ; Granularity.
-    db 0                         ; Base (high).
-
-
+    dq 0x00af93000000ffff ; probably wrong tho
 .UserCode: equ $ - GDT64         ; The code descriptor.
-    dw 0                         ; Limit (low).
-    dw 0                         ; Base (low).
-    db 0                         ; Base (middle)
-    db 11111010b                 ; Access (exec/read).
-    db 10101111b                 ; Granularity, 64 bits flag, limit19:16.
-    db 0                         ; Base (high).
+    dq 0x00affb000000ffff
 .UserData: equ $ - GDT64         ; The data descriptor.
-    dw 0                         ; Limit (low).
-    dw 0                         ; Base (low).
-    db 0                         ; Base (middle)
-    db 11110010b                 ; Access (read/write).
-    db 00000000b                 ; Granularity.
-    db 0                         ; Base (high).
+    dq 0x00aff3000000ffff
 .TSS: equ $ - GDT64
 .TSSE:
     times 16 db 0
@@ -250,7 +261,8 @@ GDT64:                           ; Global Descriptor Table (64-bit).
     dw $ - GDT64 - 1             ; Limit.
     dq GDT64                     ; Base.
 
-
+align 16
+times 4 db 0
 TSS: 
     dd 0 ; 0x00 reserved
 .tss_rsp0:

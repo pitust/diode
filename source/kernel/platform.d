@@ -3,6 +3,23 @@ module kernel.platform;
 import kernel.optional;
 import ldc.attributes;
 
+
+/// Call a system call
+extern(C) void platform_sc(ulong sysno, void* data);
+/// Branch to userland
+extern(C) @safe void user_branch(ulong tgd, void* stack);
+/// Set Jump
+extern (C) @(llvmAttr("returns-twice"))
+ulong setjmp(jmpbuf* buf);
+/// Long Jump
+extern (C) @(llvmAttr("noreturn"))
+void longjmp(jmpbuf* buf, ulong value);
+private __gshared Option!(jmpbuf*) _catch_assert = Option!(jmpbuf*)();
+/// manipulate SMAP enable
+pragma(mangle, "_stac") extern(C) void stac();
+/// manipulate SMAP enable
+pragma(mangle, "_clac") extern(C) void clac();
+
 /// A nothing
 struct nothing {
 }
@@ -53,6 +70,53 @@ void backtrace() {
         stk = stk.rbp;
     }
 }
+
+/// IA32_EFER
+public const uint IA32_EFER = 0xC0000080;
+
+/// IA32_EFER System Call Extensions
+public const uint IA32_EFER_SCE = 1 << 0;
+/// IA32_EFER Long Mode Enable
+public const uint IA32_EFER_LME = 1 << 8;
+/// IA32_EFER Long Mode Active
+public const uint IA32_EFER_LMA = 1 << 10;
+/// IA32_EFER No Execute Enable
+public const uint IA32_EFER_NXE = 1 << 11;
+
+///
+public const uint IA32_STAR = 0xC0000081;
+///
+public const uint IA32_LSTAR = 0xC0000082;
+///
+public const uint IA32_SFMASK = 0xC0000084;
+
+
+
+/// Read an MSR
+ulong rdmsr(uint msr) {
+    ulong outp;
+    asm {
+        mov ECX, msr;
+        rdmsr;
+        shr RDX, 32;
+        or RDX, RAX;
+        mov outp, RDX;
+    }
+    return outp;
+}
+
+/// Write an MSR
+void wrmsr(uint msr, ulong value) {
+    uint lo = cast(uint)value;
+    uint hi = cast(uint)(value >> 32);
+    asm {
+        mov ECX, msr;
+        mov EAX, lo;
+        mov EDX, hi;
+        rdmsr;
+    }
+}
+
 /// Reload CS
 extern (C) void reload_cs();
 private extern (C) ulong _rdrand();
@@ -155,15 +219,6 @@ struct jmpbuf {
     private ulong rsi;
 }
 
-/// Set Jump
-extern (C) @(llvmAttr("returns-twice"))
-ulong setjmp(jmpbuf* buf);
-
-/// Long Jump
-extern (C) @(llvmAttr("noreturn"))
-void longjmp(jmpbuf* buf, ulong value);
-private __gshared Option!(jmpbuf*) _catch_assert = Option!(jmpbuf*)();
-
 /// Catch assertions from `fn`
 Option!T catch_assert(T, Args...)(T function(Args) fn, Args args) {
     Option!(jmpbuf*) _catch_assert_bak = _catch_assert;
@@ -217,18 +272,21 @@ void flags(ulong flags) {
         popf;
     }
 }
-private extern(C) ulong getrsp0();
-private extern(C) void setrsp0(ulong v);
+private extern(C) void* getrsp0();
+private extern(C) void setrsp0(void* v);
+private extern(C) void setist1(void* v);
 
 /// Get the contents of `rsp0`
-ulong rsp0() {
-    
+void* rsp0() {
     return getrsp0();
+}
+/// Update the contents of `ist1`
+void ist1(void* v) {
+    setist1(v);
 }
 
 /// Update the contents of `rsp0`
-void rsp0(ulong rsp0nv) {
-    
+void rsp0(void* rsp0nv) {
     setrsp0(rsp0nv);
 }
 

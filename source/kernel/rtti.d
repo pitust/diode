@@ -58,7 +58,11 @@ TypeInfo* typeinfo(T)() {
             }
 
             static void printer(void* self, string subarray, int prenest = 0, bool is_field = false) {
-                putdyn(subarray, *cast(T*) self, prenest, is_field);
+                static if (__traits(compiles, putdyn(subarray, *cast(T*) self, prenest, is_field))) {
+                    putdyn(subarray, *cast(T*) self, prenest, is_field);
+                } else {
+                    putsk("<unprintable>");
+                }
             }
         }
 

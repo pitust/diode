@@ -443,7 +443,7 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
                         if (is_first) {
                             putsk('\n');
                             for (int i = 0; i < prenest; i++) {
-                                putsk(">");
+                                putsk(" ");
                             }
                             is_first = false;
                         }
