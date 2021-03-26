@@ -176,13 +176,13 @@ void* alloc_user_virt() {
 /// Allocate a stack
 void* alloc_stack() {
     ulong base = stackbase;
-    stackbase += 0x5000;
-    foreach (i; 0..4) {
+    stackbase += 0x5000 + 0x4000;
+    foreach (i; 0..8) {
         void* page = page();
         ulong* a = get_pte_ptr(cast(void*)(base + (i << 12))).unwrap();
         *a = 3 | cast(ulong)page;
     }
-    return cast(void*)(base + 0x4000);
+    return cast(void*)(base + 0x8000);
 }
 
 /// Free a stack

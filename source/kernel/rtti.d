@@ -4,6 +4,16 @@ import kernel.mm;
 import kernel.io;
 import kernel.optional;
 
+/// Member info
+struct MemberInfo {
+    /// Name    
+    string name;
+    /// Offset
+    ulong offset;
+    /// Type
+    TypeInfo* info;
+}
+
 /// Type information
 struct TypeInfo {
     /// The type ID
@@ -14,6 +24,9 @@ struct TypeInfo {
 
     /// Name
     string name;
+
+    /// Members
+    MemberInfo[] members;
 
     /// opFormatter
     void opFormatter(string subarray, int _prenest) {
@@ -70,6 +83,20 @@ TypeInfo* typeinfo(T)() {
         tyi.type_id = cast(ulong) cast(void*)(&TypeinfoInternal.typeidgen);
         tyi.print = &TypeinfoInternal.printer;
         tyi.name = T.stringof;
+        static if (__traits(compiles, __traits(allMembers, *(cast(T*)0)))) {
+            enum members = __traits(allMembers, *(cast(T*)0));
+            MemberInfo[members.length] mem;
+            int i = 0;
+            foreach (member; members) {
+                mem[i].name = member;
+                mem[i].offset = cast(ulong)&__traits(getMember, (cast(T*)0), member);
+                mem[i++].info = typeinfo!(typeof(__traits(getMember, (cast(T*)0), member)))();
+            }
+            tyi.members = mem;
+        } else {
+            MemberInfo[0] mem;
+            tyi.members = mem;
+        }
         return &tyi;
     }
 }

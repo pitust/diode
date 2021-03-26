@@ -110,3 +110,22 @@ struct Port {
     /// Port's message, if any
     PortMessage* message = cast(PortMessage*)0;
 }
+
+/// A fake (hax/kernel) port
+struct FakePort {
+    /// Recieve
+    PortError function (FakePort*, ref byte[] data) _recv;
+    /// Send
+    PortError function (FakePort*, byte[] data) _send;
+    /// Data
+    void* data;
+    
+    /// Recieve
+    PortError recv(ref byte[] data) {
+        return this._recv(&this, data);
+    }
+    /// Send
+    PortError send(byte[] data) {
+        return this._send(&this, data);
+    }
+}

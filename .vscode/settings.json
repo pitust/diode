@@ -1,11 +1,14 @@
 {
     "d.neverUseDub": true,
     "d.stdlibPath": [
-        "/opt/homebrew/Cellar/ldc/1.25.0/include/dlang/ldc"
+        "/opt/homebrew/Cellar/ldc/1.25.0/include/dlang/ldc",
+        "${workspaceFolder}/build"
     ],
     "files.associations": {
         "Tracefile": "yaml",
         "stdint.h": "c",
-        "assert.h": "c"
+        "assert.h": "c",
+        "vector": "cpp",
+        "exception": "cpp"
     }
 }

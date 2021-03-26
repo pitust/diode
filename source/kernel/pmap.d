@@ -1,6 +1,6 @@
 module kernel.pmap;
 
-import kernel.io : Hex, printk, OMeta, ptr_ometa;
+import kernel.io;
 import kernel.optional;
 
 private ulong* read_cr3() {
@@ -26,7 +26,8 @@ struct Phys {
         pte_addr[1] = 0x3 | (cast(ulong)(_addr + 0x1000) & 0x000f_ffff_ffff_f000);
         flush_tlb();
         func(cast(T*)(addr + (_addr & 0x1ff)), args);
-        *pte_addr = 0;
+        pte_addr[0] = 0;
+        pte_addr[1] = 0;
         flush_tlb();
     }
 
@@ -104,7 +105,7 @@ Option!(ulong*) get_pte_ptr(void* va) {
             import kernel.util : memset;
 
             void* new_page_table = page();
-            debug printk("Paving a new memory page, index {hex} into PTE at {}, paving {}",
+            debug printk(DEBUG, "Paving a new memory page, index {hex} into PTE at {}, paving {}",
                     key, &page_table[key], new_page_table);
             memset(cast(byte*) new_page_table, 0, 4096);
             page_table[key] = 0x7 | cast(ulong) new_page_table;

@@ -25,6 +25,7 @@ private const ulong HEADER_TAG_FB_MTRR_ID = 0x4c7bb07731282e00;
 private const ulong HEADER_TAG_SMP_ID = 0x1ab015085f3273df;
 private const ulong HEADER_TAG_5LV_PAGING_ID = 0x932f477032007e8f;
 private const ulong STRUCT_TAG_CMDLINE_ID = 0xe5e76a1b4597a781;
+
 /// Command line stivale2 tag
 extern (C) struct TagCommandLine {
     /// the tag struct

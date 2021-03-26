@@ -3,7 +3,10 @@ module kernel.irq;
 import kernel.io;
 import kernel.mm;
 import kernel.task;
+import kernel.util;
+import kernel.guards;
 import kernel.platform;
+import kernel.syscall.dispatch;
 import kernel.task : sched_yield;
 
 private extern (C) struct ISRFrameNOEC {
@@ -106,10 +109,22 @@ extern (C) void isrhandle_noec(ulong isr, ISRFrameNOEC* frame) {
         sched_yield();
         return;
     }
-    if (isr ==  /* parallel port */ 0x27) {
-        putck('?');
-        pic_eoi();
+    if (isr == /* weird bochs thing */ 0x27) {
         return;
+    }
+    if (isr == /* invalid opcode */ 0x6) {
+        // if the CPU has no SCE, we just trap #UDs from syscall.
+        auto smoff = no_smap();
+        ubyte[2] insn = [/* syscall */ 0x0f, 0x05];
+        if (memcmp(cast(byte*)frame.rip, cast(byte*)insn.ptr, 2) == 0)  {
+            smoff.die();
+            frame.rip += 2;
+            frame.rax = cast(ulong) syscall(frame.rdi, cast(void*)frame.rsi);
+            // we also trash rcx/r11
+            frame.rcx = cast(ulong) 0xfeaddeadbeefcafe;
+            frame.r11 = cast(ulong) 0xfeaddeadbeefcafe;
+            return;
+        }
     }
     printk(ERROR, "ISR: {hex}", isr);
     printk(ERROR, "Frame: {hex}", frame);
@@ -175,8 +190,9 @@ IDTR new_idtr() {
     const ulong* targets = get_idt_targets();
     foreach (i; 0 .. 256) {
         idt[i].addr = targets[i];
-        idt[i].ist = 1;
+        idt[i].ist = 0;
     }
+    // idt[8].ist = 1;
     idtr.addr = cast(ulong) idt.ptr;
     idtr.size = 4096;
     return idtr;
@@ -223,7 +239,7 @@ void remap(ubyte offset1, ubyte offset2) {
     outp(PIC1_DATA, ICW4_8086);
     outp(PIC2_DATA, ICW4_8086);
 
-    outp(PIC1_DATA, cast(ubyte)~0b0000_0101);
+    outp(PIC1_DATA, cast(ubyte)~0b0000_0001);
     outp(PIC2_DATA, cast(ubyte)~0b0000_0000);
 
     outp(0x43, 0x34);

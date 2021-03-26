@@ -3,11 +3,10 @@ module kernel.platform;
 import kernel.optional;
 import ldc.attributes;
 
-
 /// Call a system call
-extern(C) void platform_sc(ulong sysno, void* data);
+extern (C) void platform_sc(ulong sysno, void* data);
 /// Branch to userland
-extern(C) @safe void user_branch(ulong tgd, void* stack);
+extern (C) @safe void user_branch(ulong tgd, void* stack);
 /// Set Jump
 extern (C) @(llvmAttr("returns-twice"))
 ulong setjmp(jmpbuf* buf);
@@ -16,9 +15,9 @@ extern (C) @(llvmAttr("noreturn"))
 void longjmp(jmpbuf* buf, ulong value);
 private __gshared Option!(jmpbuf*) _catch_assert = Option!(jmpbuf*)();
 /// manipulate SMAP enable
-pragma(mangle, "_stac") extern(C) void stac();
+pragma(mangle, "_stac") extern (C) void stac();
 /// manipulate SMAP enable
-pragma(mangle, "_clac") extern(C) void clac();
+pragma(mangle, "_clac") extern (C) void clac();
 
 /// A nothing
 struct nothing {
@@ -90,8 +89,6 @@ public const uint IA32_LSTAR = 0xC0000082;
 ///
 public const uint IA32_SFMASK = 0xC0000084;
 
-
-
 /// Read an MSR
 ulong rdmsr(uint msr) {
     ulong outp;
@@ -107,7 +104,7 @@ ulong rdmsr(uint msr) {
 
 /// Write an MSR
 void wrmsr(uint msr, ulong value) {
-    uint lo = cast(uint)value;
+    uint lo = cast(uint) value;
     uint hi = cast(uint)(value >> 32);
     asm {
         mov ECX, msr;
@@ -272,9 +269,10 @@ void flags(ulong flags) {
         popf;
     }
 }
-private extern(C) void* getrsp0();
-private extern(C) void setrsp0(void* v);
-private extern(C) void setist1(void* v);
+
+private extern (C) void* getrsp0();
+private extern (C) void setrsp0(void* v);
+private extern (C) void setist1(void* v);
 
 /// Get the contents of `rsp0`
 void* rsp0() {

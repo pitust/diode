@@ -165,22 +165,10 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
 
     printk("{hex}/{hex} bytes used", heap_usage, heap_max);
 
-    asm {
-        // sti;
-    }
-
-    // printk("HEY 0!");
-    // test2();
-    asm {
-        
-    }
-    printk("eh: {hex}", bits(4, 16, 4, 0xffff3dad));
     const ulong ptr = gettss;
 
     gettssgdt[0] = bits(16, 24, 24, ptr) | bits(56, 32, 8, ptr) | (103 & 0xff) | (0b1001UL << 40) | (1UL << 47);
     gettssgdt[1] = ptr >> 32;
-    printk("L: {hex}", gettssgdt[0]);
-    printk("L: {hex}", gettssgdt[1]);
     assert(gettssgdtid == 0x28, "Unable to load it in");
     fgdt();
     load_tss();
@@ -188,6 +176,7 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
     ist1 = alloc_stack();
     printk("Fun RSP0/IST1 in!");
     wrmsr(IA32_EFER, rdmsr(IA32_EFER) | IA32_EFER_SCE);
+    printk("{hex}", rdmsr(IA32_EFER));
     wrmsr(IA32_LSTAR, cast(ulong)&platform_sc);
     wrmsr(IA32_STAR, cast(ulong)(0x0000_1b10) << 32);
     wrmsr(IA32_SFMASK, /* IF */ 0x200);
@@ -197,11 +186,12 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
         mov EAX, 7;
         mov ECX, 0;
         cpuid;
+        shr EBX, 20;
+        and EBX, 1;
         mov outp, EBX;
     }
-    printk(DEBUG, "cpuid leaf (7, 0) = {hex}", outp);
-    printk(DEBUG, "cpuid leaf (7, 0) & (1 << 20) = {hex}", outp & (1 << 20));
-    if (outp & (1 << 20)) {
+    printk(DEBUG, "cpuid leaf (7, 0)[20] = {hex}", outp);
+    if (outp & 1) {
         asm {
             mov RAX, CR4;
             or RAX, 3 << 20;
@@ -214,6 +204,7 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
     cli();
     const void* arr = page();
     void* tgd = cast(void*)(0x0000_0004_f000_0000);
+    
 
     *get_pte_ptr(tgd).unwrap() = 7 | cast(ulong)arr;
     flush_tlb();
@@ -231,7 +222,32 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
 
     // jmp $
     auto g = no_smap();
-    *(cast(ushort*)tgd) = 0xfeeb;
+    ubyte* mem = cast(ubyte*)tgd;
+    // mov di, 1            66bf0100
+    // mov rsi, 0x4f0000040 48be400000f004000000
+    // syscall              0f 05
+    // jmp $                eb fe
+    
+    mem[0] = 0x66;
+    mem[1] = 0xbf;
+    mem[2] = 0x01;
+    mem[3] = 0x00;
+    mem[4] = 0x48;
+    mem[5] = 0xbe;
+    mem[6] = 0x40;
+    mem[7] = 0x00;
+    mem[8] = 0x00;
+    mem[9] = 0xf0;
+    mem[10] = 0x04;
+    mem[11] = 0x00;
+    mem[12] = 0x00;
+    mem[13] = 0x00;
+    mem[14] = 0x0f;
+    mem[15] = 0x05;
+    mem[16] = 0xeb;
+    mem[17] = 0xfe;
+
+    mem[0x40] = 12;
     printk("Mappings are in! ({hex})", cast(ulong*)tgd);
     g.die();
     printk("Branching to {}", tgd);

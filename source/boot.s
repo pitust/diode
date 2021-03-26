@@ -181,11 +181,39 @@ global platform_sc
 global user_branch
 global _stac
 global _clac
+is_smap: dq 0
+is_smap_i: dq 0
+
+smap_i:
+    mov rax, 1
+    cmp [rel is_smap_i], rax
+    je .retr
+    mov eax, 7
+    mov ecx, 0
+    cpuid
+    shr ebx, 20
+    and ebx, 1
+    mov [rel is_smap], rbx
+    mov rax, 1
+    mov [rel is_smap_i], rax
+.retr:
+    ret
+
 _stac:
+    call smap_i
+    mov rax, 1
+    cmp [rel is_smap], rax
+    jne .retr
     stac
+.retr:
     ret
 _clac:
+    call smap_i
+    mov rax, 1
+    cmp [rel is_smap], rax
+    jne .retr
     clac
+.retr:
     ret
 
 user_branch:
@@ -196,11 +224,17 @@ user_branch:
     mov fs,ax 
     mov gs,ax
 
+    xor rbx, rbx
+    xor rcx, rcx
     push rax
+    xor rax, rax
     push rsi
+    xor rsi, rsi
     push 0x200
     push rdx
+    xor rdx, rdx
     push rdi
+    xor rdi, rdi
     iretq
 
 platform_sc:

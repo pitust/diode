@@ -69,8 +69,9 @@ void putsk(char s) {
 }
 
 private struct EnumMarker {
-    
+
 }
+
 private struct ArrayMarker(T) {
 }
 
@@ -87,14 +88,12 @@ extern (C) struct Hex(T) {
     }
 }
 
-private template isEnum(alias symb)
-{
+private template isEnum(alias symb) {
     static if (is(symb == enum))
         enum bool isEnum = true;
     else
         enum bool isEnum = false;
 }
-
 
 private template Unqual(T) {
     static if (is(T U == shared(const U)))
@@ -291,7 +290,8 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
         } else {
             putsk_string(arg);
         }
-    } static if (is(T == EnumMarker)) {
+    }
+    static if (is(T == EnumMarker)) {
         static foreach (k; __traits(allMembers, ObjTy)) {
             {
                 if (__traits(getMember, ObjTy, k) == arg) {
@@ -494,7 +494,9 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
                         for (int i = 0; i < prenest; i++) {
                             putsk(" ");
                         }
-                    } else static if (!isCallable!(__traits(getMember, arg, member))) {
+                    } else static if (!isCallable!(__traits(getMember, arg, member)) && __traits(compiles, putdyn(
+                            subarray, __traits(getMember, arg,
+                            member), prenest + 4, true))) {
                         static if (!__traits(compiles, __traits(getMember, arg, member)
                                 ._oskip) && !__traits(hasMember, arg, "__noshow_" ~ member)) {
                             if (is_first) {
@@ -590,7 +592,7 @@ void printk(string A = __FILE__, int L = __LINE__, Args...)(Log l, string s, Arg
         maxl = 5;
         break;
     default:
-        printk(FATAL, "Invalid level: {}", cast(int)l);
+        printk(FATAL, "Invalid level: {}", cast(int) l);
         assert(0);
     }
     putsk("\x1b[0m] ");

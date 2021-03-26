@@ -1,9 +1,11 @@
 module kernel.task;
 
-import kernel.mm : alloc, free;
-import kernel.platform : flags, cli, setjmp, longjmp, jmpbuf, lock;
+import kernel.mm;
+import kernel.platform;
 import kernel.io;
 import kernel.irq;
+import kernel.port;
+import kernel.util;
 import ldc.attributes;
 
 /// A `t` - a DIOS task.
@@ -16,6 +18,14 @@ struct t {
     ulong niceness;
     /// the TID
     ulong tid;
+    /// The mech ports owned by this `t`
+    PortRights[] ports;
+    /// The fake mech ports owned by this `t`
+    FakePort[] fakeports;
+    /// The low (user) pages owned by this `t`
+    ulong[256] pages;
+    /// Pages mapped
+    ulong[] memoryowned;
 }
 
 /// A task creation request
@@ -24,7 +34,8 @@ private struct r {
     void* arg;
 }
 
-private __gshared t* cur_t;
+/// Current task
+__gshared t* cur_t;
 private __gshared t zygote_t;
 private __gshared lock tidlock;
 private __gshared ulong tidbase = 1;
@@ -82,6 +93,9 @@ void task_create(T)(void function(T*) func, T* arg, void* stack) {
     void* argg = cast(void*)borrow_r;
 
     t* the_t = alloc!(t)();
+    memset(cast(byte*)the_t.pages.ptr, 0, 2048);
+    void*[0] a;
+    // the_t.memoryowned = *&a;
     ulong* s = the_t.state.ptr;
     asm {
         mov R13, stack;
@@ -121,8 +135,24 @@ private extern(C) void task_enqueue(ulong* buf) {
 void sched_yield() {
     const ulong flg = flags;
     cli();
+    ulong* cr3;
+    asm {
+        mov RAX, CR3;
+        mov cr3, RAX;
+    }
+    foreach (i; 0..256) {
+        cur_t.pages[i] = cr3[i];
+        cr3[i] = 0;
+    }
     task_switch(cur_t.next.state.ptr);
-    
+    foreach (i; 0..256) {
+        cr3[i] = cur_t.pages[i];
+    }
+    asm {
+        mov RAX, CR3;
+        mov CR3, RAX;
+    }
+
     flags = flg;
 }
 
