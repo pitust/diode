@@ -3,6 +3,5 @@ docs.json
 __dummy.html
 *.o
 *.obj
-/build
+/builddir
 /.config
-/build.ninja

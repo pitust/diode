@@ -5,6 +5,7 @@ void __assert(char*, char*, int);
 #define assert(e)  \
     ((void) ((e) ? ((void)0) : __assert (#e, __FILE__, __LINE__)))
 
+void task_trampoline(void* data);
 void task_enqueue(void** buf);
 void task_switch(void** buf2) {
     void* buf1v[5];

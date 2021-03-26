@@ -10,5 +10,5 @@
         "assert.h": "c",
         "vector": "cpp",
         "exception": "cpp"
-    }
+    },
 }
