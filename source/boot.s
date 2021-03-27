@@ -48,7 +48,6 @@ rdrandom:
 global asm_switch
 global setjmp
 global longjmp
-global _D4core5bitop4outpFNbNikkZh
 global _rdrand
 
 extern sched_switch

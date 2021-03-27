@@ -576,6 +576,7 @@ void printk(string A = __FILE__, int L = __LINE__, Args...)(Log l, string s, Arg
     switch (l) {
     case DEBUG:
         putsk("\x1b[30;1mDEBUG");
+        maxl = 5;
         break;
     case INFO:
         putsk("\x1b[32;1mINFO");
@@ -596,7 +597,7 @@ void printk(string A = __FILE__, int L = __LINE__, Args...)(Log l, string s, Arg
         assert(0);
     }
     putsk("\x1b[0m] ");
-    putsk_string(A[7 .. A.length]);
+    putsk_string(A[3 .. A.length]);
     putsk(":");
     const(char[]) asds = Itoa!L;
     foreach (c; asds) {
@@ -608,7 +609,7 @@ void printk(string A = __FILE__, int L = __LINE__, Args...)(Log l, string s, Arg
     for (ulong i = asds.length; i < lineno_max; i++)
         putck(' ');
 
-    int offinit = cast(int)(lineno_max + A.length - 2 + maxl);
+    int offinit = cast(int)(lineno_max + A.length - 5 + maxl);
 
     int idx_into_s = 0;
     foreach (arg; args) {

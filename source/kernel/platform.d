@@ -239,7 +239,7 @@ extern (C) void __assert(char* assertion, char* file, int line) {
     const ulong f = flags;
     cli();
 
-    printk(FATAL, "Kernel assertion failed: {} at {}:{}", assertion, file, line);
+    printk(FATAL, "Kernel assertion failed: {} at {}:{}", assertion, file + 3, line);
     backtrace();
     if (_catch_assert.is_some()) {
         flags = f;

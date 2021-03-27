@@ -7,7 +7,6 @@ WORK_DIR=`echo $1 | sed 's/kernel\.elf//g'`
 HDD=`echo $1 | sed 's/\.elf/.hdd/g'`
 MAGIC_CPIO=$2
 if [ ! -e $HDD ]; then truncate $HDD -s 64M; duogpt $HDD; fi
-echfs-utils -g -p0 $HDD quick-format 512
 cd $WORK_DIR
 mkdir -vp env
 cd env
@@ -27,6 +26,9 @@ MODULE_PATH=boot:///boot/initrd.bin
 MODULE_STRING=initrd.bin
 CMDLINE=info!
 EOF
+
+
+echfs-utils -g -p0 ../kernel.hdd format 512
 
 find * -type d | xargs -L 1 echfs-utils -g -p0 ../kernel.hdd mkdir
 find * -type f | xargs -L 1 bash -c 'python3 '$IMPORT_PY' $1 || true' --
