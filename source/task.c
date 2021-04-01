@@ -15,6 +15,9 @@ void task_switch(void** buf2) {
     task_enqueue(buf1v);
     __builtin_longjmp(buf2, 1);
 }
+void task_pls_die(void** buf) {
+    __builtin_longjmp(buf, 1);
+}
 void altstack_task_setup_internal(void* data, void** target_buf, void** exit_buf) {
     if (!__builtin_setjmp(target_buf)) {
         __builtin_longjmp(exit_buf, 1);

@@ -89,6 +89,11 @@ public const uint IA32_LSTAR = 0xC0000082;
 ///
 public const uint IA32_SFMASK = 0xC0000084;
 
+extern(C) long d_syscall(ulong a, ulong b) {
+    import kernel.syscall.dispatch;
+    return syscall(a, b);
+}
+
 /// Read an MSR
 ulong rdmsr(uint msr) {
     ulong outp;
@@ -110,7 +115,7 @@ void wrmsr(uint msr, ulong value) {
         mov ECX, msr;
         mov EAX, lo;
         mov EDX, hi;
-        rdmsr;
+        wrmsr;
     }
 }
 
@@ -229,6 +234,7 @@ Option!T catch_assert(T, Args...)(T function(Args) fn, Args args) {
     _catch_assert = *&_catch_assert_bak;
     return Option!(T)(v);
 }
+
 
 /// Internal assetion code
 extern (C) void __assert(char* assertion, char* file, int line) {

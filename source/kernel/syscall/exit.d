@@ -2,29 +2,52 @@ module kernel.syscall.exit;
 
 import kernel.io;
 import kernel.mm;
+import kernel.loafencode;
 import kernel.pmap;
 import kernel.task;
 import kernel.syscall.util;
+import kernel.ports.kbootstrap;
 
 /// Exit
 long sys_exit(void* data) {
-    struct Exit {
-        ulong code;
-    }
 
-    Exit e;
+    BootstrapCmdExit e;
+    e.cmd = BootstrapCmd.NOTIFY_EXIT;
     e.code = 0;
-    copy_from_user(data, cast(void*)&e, e.sizeof);
+    copy_from_user(data, cast(void*)&e.code, ulong.sizeof);
     printk(DEBUG, "Exiting with code: {}", e.code);
     ulong* pt;
     asm {
         mov RAX, CR3;
         mov pt, RAX;
     }
+
+    foreach (i; 4..256) {
+        pt[i] = 0;
+    }
+
+    flush_tlb();
+
     // freet(pt);
     foreach (region; cur_t.memoryowned) {
         addpage(region, 1);
     }
 
-    assert(0, "sys_exit");
+    byte[] dat = alloca!(byte)(0);
+    encode(e, dat);
+
+    // If they have at least one port,
+    if (cur_t.ports.length > 0) {
+        printk(DEBUG, "Sending exit info to regular BSP");
+        // then signal on the bootstrap port
+        cur_t.ports[0].send(/* ktid == pid */ cur_t.tid, dat);
+        // or if they have a fake port...
+    } else if (cur_t.fakeports.length > 0) {
+        printk(DEBUG, "Sending exit info to fake BSP");
+        // then signal on the kbootstrap port
+        cur_t.fakeports[0].send(/* ktid == pid */ cur_t.tid, dat);
+    }
+
+
+    task_exit();
 }

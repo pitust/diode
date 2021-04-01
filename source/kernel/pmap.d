@@ -75,7 +75,6 @@ Option!Phys get_page_for(void* va) {
     foreach (ushort key; offsets) {
         if (page_table[key] & 0x80) {
             return Option!Phys(Phys(page_table[key] & 0x000f_ffff_ffff_f000));
-            break;
         }
         if (!(page_table[key] & 1)) {
             return Option!(Phys)();
@@ -84,6 +83,39 @@ Option!Phys get_page_for(void* va) {
     }
 
     return Option!Phys(Phys(cast(ulong) page_table));
+}
+
+Option!(ulong*) get_user_pte_ptr(void* va) {
+    ulong* page_table = read_cr3();
+    ulong* control_pte = cast(ulong*) 0;
+    ulong va_val = (cast(ulong) va) & 0x000f_ffff_ffff_f000;
+    const ushort[4] offsets = [
+        (va_val >> 12 >> 9 >> 9 >> 9) & 0x1ff, (va_val >> 12 >> 9 >> 9) & 0x1ff,
+        (va_val >> 12 >> 9) & 0x1ff, (va_val >> 12) & 0x1ff
+    ];
+    int i = -1;
+    foreach (ushort key; offsets) {
+        i++;
+        if (page_table[key] & 0x80) {
+            return Option!(ulong*)();
+        }
+        if (!(page_table[key] & 1) && i != 3) {
+            import kernel.mm : page, push;
+            import kernel.task : cur_t;
+            import kernel.util : memset;
+
+            void* new_page_table = page();
+            printk(DEBUG, "Paving a new (user) memory page, index {hex} into PTE at {}, paving {}",
+                    key, &page_table[key], new_page_table);
+            memset(cast(byte*) new_page_table, 0, 4096);
+            push(cur_t.memoryowned, cast(ulong) new_page_table);
+            page_table[key] = 0x7 | cast(ulong) new_page_table;
+        }
+        control_pte = &page_table[key];
+        page_table = cast(ulong*)(page_table[key] & 0x000f_ffff_ffff_f000);
+    }
+
+    return Option!(ulong*)(control_pte);
 }
 
 Option!(ulong*) get_pte_ptr(void* va) {

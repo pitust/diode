@@ -22,7 +22,7 @@ struct SMAPGuard {
         if (is_legit) {
             rc -= 1;
             if (rc == 0) {
-            printk(DEBUG, "Reenabling SMAP");
+            // printk(DEBUG, "Reenabling SMAP");
                 clac();
             }
         }
@@ -35,7 +35,7 @@ struct SMAPGuard {
         rc -= 1;
         
         if (rc == 0) {
-            printk(DEBUG, "Reenabling SMAP");
+            // printk(DEBUG, "Reenabling SMAP");
             clac();
         }
     }
@@ -44,7 +44,7 @@ struct SMAPGuard {
 SMAPGuard no_smap() {
     bool fake = false;
     stac();
-    printk(DEBUG, "Disable SMAP");
+    // printk(DEBUG, "Disable SMAP");
     SMAPGuard the = *cast(SMAPGuard*)&fake;
     the.is_legit = true;
     rc += 1;

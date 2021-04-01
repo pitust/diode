@@ -114,18 +114,19 @@ struct Port {
 /// A fake (hax/kernel) port
 struct FakePort {
     /// Recieve
-    PortError function (FakePort*, ref byte[] data) _recv;
+    PortError function (FakePort*, long pid, ref byte[] data) _recv;
     /// Send
-    PortError function (FakePort*, byte[] data) _send;
+    PortError function (FakePort*, long pid, byte[] data) _send;
+
     /// Data
     void* data;
     
     /// Recieve
-    PortError recv(ref byte[] data) {
-        return this._recv(&this, data);
+    PortError recv(long pid, ref byte[] data) {
+        return this._recv(&this, pid, data);
     }
     /// Send
-    PortError send(byte[] data) {
-        return this._send(&this, data);
+    PortError send(long pid, byte[] data) {
+        return this._send(&this, pid, data);
     }
 }

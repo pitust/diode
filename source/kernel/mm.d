@@ -1,13 +1,14 @@
 module kernel.mm;
 
+import kernel.io;
+import kernel.task;
+import kernel.rtti;
 import kernel.autoinit;
 import kernel.optional;
-import kernel.io;
-import kernel.platform : rdweakrandom, rdrandom;
+import std.conv : emplace;
 import kernel.util : memset;
 import kernel.pmap : Phys, get_pte_ptr;
-import kernel.rtti;
-import std.conv : emplace;
+import kernel.platform : rdweakrandom, rdrandom;
 
 private extern (C) struct MPageHeader {
     align(4) MPageHeader* next;
@@ -15,6 +16,13 @@ private extern (C) struct MPageHeader {
 }
 
 private __gshared MPageHeader* first = cast(MPageHeader*) 0;
+
+T[] array(T)(T* ptr, ulong len) {
+    ulong[2] data;
+    data[0] = len;
+    data[1] = cast(ulong)ptr;
+    return transmute!(ulong[2], T[])(data);
+}
 
 /// Allocate a phys
 Phys phys() {
@@ -26,9 +34,9 @@ private __gshared ulong total = 0;
 
 /// Out of memory!
 void oom_cond() {
-    printk("OOM condition!");
-    printk(" Kernel heap: {hex}/{hex} bytes used", heap_usage, heap_max);
-    printk(" Page frame allocator: {hex}/{hex} pages used", used, total);
+    printk(FATAL, "OOM condition!");
+    printk(FATAL, " Kernel heap: {hex}/{hex} bytes used", heap_usage, heap_max);
+    printk(FATAL, " Page frame allocator: {hex}/{hex} pages used", used, total);
     assert(false, "OOM");
 }
 
@@ -174,13 +182,14 @@ void* alloc_user_virt() {
 }
 
 /// Allocate a stack
-void* alloc_stack() {
+void* alloc_stack(t* cur = cur_t) {
     ulong base = stackbase;
     stackbase += 0x5000 + 0x4000;
     foreach (i; 0..8) {
         void* page = page();
         ulong* a = get_pte_ptr(cast(void*)(base + (i << 12))).unwrap();
         *a = 3 | cast(ulong)page;
+        push(cur.memoryowned, cast(ulong)page);
     }
     return cast(void*)(base + 0x8000);
 }
@@ -260,7 +269,6 @@ Option!(void*) mmIsHeap(void* a) {
             return O(poolbase + 16 + cast(void*)(value - (nego << 4)));
         nego++;
     }
-    return O();
 }
 
 /// is `arg` on the heap? If yes, tells you where its corresponding HeapBlock is placed.
@@ -274,6 +282,19 @@ private void* kalloc(ulong size) {
     size = (size + 15) & 0xffff_ffff_ffff_fff0;
     if (poolsize == 0) {
         commit_to_pool();
+    }
+    if (size > 4096) {
+        size = (size + 4095) / 4096;
+        stackbase += 0x1000;
+        ulong region = stackbase;
+        foreach (i; 0..size) {
+            stackbase += 0x1000;
+            void* page = page();
+            ulong* a = get_pte_ptr(cast(void*)(region + (i << 12))).unwrap();
+            *a = 3 | cast(ulong)page;
+        }
+        return cast(void*)region;
+        // stackbase
     }
     const ulong ss = size >> 4;
     while (true) {
@@ -298,10 +319,6 @@ private void* kalloc(ulong size) {
             heap_usage += size;
             heap_usage += ss / 8;
             spillbits += ss % 8;
-            while (spillbits > 8) {
-                spillbits -= 8;
-                heap_usage += 1;
-            }
             return cast(void*)(rand + poolbase);
         }
         commit_to_pool();
@@ -310,6 +327,9 @@ private void* kalloc(ulong size) {
 }
 
 private void kfree(void* value, ulong size) {
+    if (cast(ulong)value < poolbase) {
+        assert(0, "freeing stackdata is TODO");
+    }
     const ulong addr = cast(ulong) value - poolbase;
     size = (size + 15) & 0xffff_ffff_ffff_fff0;
     const ulong ss = size >> 4;
@@ -338,7 +358,8 @@ T* alloc(T, Args...)(Args arg) {
     return a;
 }
 
-private U transmute(T, U)(T a) {
+/// Type structure 1337 hax. Wildly unsafe.
+U transmute(T, U)(T a) {
     struct L {
         T v;
     }
@@ -381,10 +402,10 @@ T[] alloca(T)() {
 }
 
 /// Allocate a dynamically-sized array of `n` elements
-T[] alloca(T)(ulong n) {
+T[] alloca(T, Args...)(ulong n, Args args) {
     T[] oa = alloca_unsafe!T(n);
     foreach (i; 0 .. n) {
-        emplace(&oa[i]);
+        emplace(&oa[i], args);
     }
     return oa;
 }
@@ -421,18 +442,6 @@ void push(T)(ref T[] arr, T e) {
 
 /// Allocate a dynamically-sized array of `n` elements
 T[] realloca(T)(T[] old, ulong n) {
-    if (n < old.length) {
-        printk(DEBUG, "Choosing shrink fast-path for realloca");
-        ulong sa = (((cast(ulong) old.ptr) - poolbase) + T.sizeof * n) >> 4;
-        const ulong downsizeChunks = ((n - old.length) * T.sizeof) >> 4;
-        foreach (i; 0 .. downsizeChunks) {
-            const ulong v = sa + i;
-            (*aps.val()).set_bitmap_offset_at(v >> 14, v & 0x3fff, apsdims, false);
-        }
-    } else if (n == old.length) {
-        printk(WARN, "realloca: you should totally not call realloca with garbage");
-        return old;
-    }
     // TODO: expand fast path
 
     T[] newa = alloca_unsafe!T(n);

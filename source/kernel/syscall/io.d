@@ -1,5 +1,9 @@
 module kernel.syscall.io;
 
+import vshared.share;
+
+// struct 
+
 /// Send
 long sys_send(void* data) {
     assert(0, "sys_send");

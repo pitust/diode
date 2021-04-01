@@ -1,13 +1,12 @@
-module kernel.io;
+module libsys.io;
 
 import core.vararg;
 import core.volatile;
 import std.traits;
 import std.algorithm;
-
-import kernel.optional;
-import kernel.platform;
-import kernel.util;
+import libsys.syscall;
+import vshared.share;
+import libsys.util;
 
 /// putsk_const_str is like putsk but for const(string)
 void putsk_const_str(const(string) s) {
@@ -27,35 +26,49 @@ void putsk_const_str(string s) {
     }
 }
 
-/// putsk is a dumb version of printk (with no newline!)
+/// putsk is a dumb version of printf (with no newline!)
 void putsk(char* s) {
     for (int i = 0; s[i] != 0; i++) {
         putck(s[i]);
     }
 }
 
-/// putsk is a dumb version of printk (with no newline!)
+/// putsk is a dumb version of printf (with no newline!)
 void putsk(immutable(char)[] s) {
     foreach (chr; s) {
         putck(chr);
     }
 }
 
-/// putsk is a dumb version of printk (with no newline!)
+/// putsk is a dumb version of printf (with no newline!)
 private void putsk_string(T)(T s) {
     foreach (chr; s) {
         putck(chr);
     }
 }
 
-/// putck prints a char (cough cough outp(DEBUG_IO_PORT, chr) cough)
+private __gshared char[128] buf;
+private __gshared int buf_idx = 0;
+
+/// Flush the I/O buffer
+void flush() {
+    KPrintBuffer kbuf;
+    kbuf.len = buf_idx - 1;
+    kbuf.ptr = buf.ptr;
+    syscall(Syscall.KPRINT, cast(void*)&kbuf);
+    buf_idx = 0;
+}
+
+/// putck prints a char (buffered)
 void putck(char c) {
     if (c != 0) {
-        outp(DEBUG_IO_PORT_NUM, c);
+        if (buf_idx == 128) flush();
+        buf[buf_idx++] = c;
+        if (c == '\n') flush();
     }
 }
 
-/// putsk is a dumb version of printk (with no newline!)
+/// putsk is a dumb version of printf (with no newline!)
 void putsk(T)(T s) {
     static assert(is(Unqual!(T) : ArrayMarker!char));
     foreach (char chr; s) {
@@ -63,7 +76,7 @@ void putsk(T)(T s) {
     }
 }
 
-/// putsk is a dumb version of printk (with no newline!)
+/// putsk is a dumb version of printf (with no newline!)
 void putsk(char s) {
     putck(s);
 }
@@ -130,7 +143,7 @@ private template Deref(T) {
         alias Deref = T;
 }
 
-private void _printk_outint(string subarray, ulong arg, bool bare = false) {
+private void _printf_outint(string subarray, ulong arg, bool bare = false) {
     int pad = 0;
     int base = 10;
     switch (subarray) {
@@ -173,7 +186,7 @@ private void _printk_outint(string subarray, ulong arg, bool bare = false) {
     putsk(arr_offset_correctly);
 }
 
-private void _printk_outint(string subarray, long arg) {
+private void _printf_outint(string subarray, long arg) {
     int pad = 0;
     int base = 10;
     switch (subarray) {
@@ -250,14 +263,14 @@ OMeta ptr_ometa() {
 }
 
 unittest {
-    printk("Test printk [short]: {}", cast(short) 3);
-    printk("Test printk [ushort]: {}", cast(ushort) 3);
-    printk("Test printk [int]: {}", cast(int) 3);
-    printk("Test printk [uint]: {}", cast(uint) 3);
-    printk("Test printk [long]: {}", cast(long) 3);
-    printk("Test printk [ulong]: {}", cast(ulong) 3);
-    printk("Test printk [string]: {}", "asdf");
-    printk("Test printk [char*]: {}", "asdf".ptr);
+    printf("Test printf [short]: {}", cast(short) 3);
+    printf("Test printf [ushort]: {}", cast(ushort) 3);
+    printf("Test printf [int]: {}", cast(int) 3);
+    printf("Test printf [uint]: {}", cast(uint) 3);
+    printf("Test printf [long]: {}", cast(long) 3);
+    printf("Test printf [ulong]: {}", cast(ulong) 3);
+    printf("Test printf [string]: {}", "asdf");
+    printf("Test printf [char*]: {}", "asdf".ptr);
 }
 
 /// Print an object!
@@ -282,7 +295,7 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
                     putsk("\\n");
                 } else if (chr > 0x7e || chr < 0x20) {
                     putsk("\\x");
-                    _printk_outint("_chr_oob", cast(ulong) chr);
+                    _printf_outint("_chr_oob", cast(ulong) chr);
                 } else {
                     putsk(chr);
                 }
@@ -326,7 +339,7 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
                     putsk("\\n");
                 } else if (arg[i] > 0x7e || arg[i] < 0x20) {
                     putsk("\\x");
-                    _printk_outint("_chr_oob", cast(ulong) arg[i]);
+                    _printf_outint("_chr_oob", cast(ulong) arg[i]);
                 } else {
                     putsk(arg[i]);
                 }
@@ -345,7 +358,7 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
                     putsk("\\n");
                 } else if (chr > 0x7e || chr < 0x20) {
                     putsk("\\x");
-                    _printk_outint("_chr_oob", cast(ulong) chr);
+                    _printf_outint("_chr_oob", cast(ulong) chr);
                 } else {
                     putsk(chr);
                 }
@@ -360,7 +373,7 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
             putsk("\\n");
         } else if (arg > 0x7e || arg < 0x20) {
             putsk("\\x");
-            _printk_outint("_chr_oob", cast(ulong) arg);
+            _printf_outint("_chr_oob", cast(ulong) arg);
         } else {
             putsk(arg);
         }
@@ -369,28 +382,28 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
         assert(subarray == "");
         putdyn("hex", arg.inner, prenest, is_field);
     } else static if (is(T == byte)) {
-        _printk_outint(subarray, cast(long) arg);
+        _printf_outint(subarray, cast(long) arg);
     } else static if (is(T == ubyte)) {
-        _printk_outint(subarray, cast(ulong) arg);
+        _printf_outint(subarray, cast(ulong) arg);
     } else static if (is(T == int)) {
-        _printk_outint(subarray, cast(long) arg);
+        _printf_outint(subarray, cast(long) arg);
     } else static if (is(T == uint)) {
-        _printk_outint(subarray, cast(ulong) arg);
+        _printf_outint(subarray, cast(ulong) arg);
     } else static if (is(T == short)) {
-        _printk_outint(subarray, cast(long) arg);
+        _printf_outint(subarray, cast(long) arg);
     } else static if (is(T == ushort)) {
-        _printk_outint(subarray, cast(ulong) arg);
+        _printf_outint(subarray, cast(ulong) arg);
     } else static if (is(T == long)) {
-        _printk_outint(subarray, arg);
+        _printf_outint(subarray, arg);
     } else static if (is(T == ulong)) {
-        _printk_outint(subarray, arg);
+        _printf_outint(subarray, arg);
     } else static if (is(T == bool)) {
         putsk(arg ? "true" : "false");
     } else static if (is(T == void)) {
         putsk("void");
     } else static if (is(T == void*)) {
         assert(subarray == "");
-        _printk_outint("ptr", cast(ulong) arg);
+        _printf_outint("ptr", cast(ulong) arg);
     } else static if (is(T U == ArrayMarker!U)) {
         putsk('[');
         bool is_first = true;
@@ -464,7 +477,7 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
             string asdf = T.stringof;
             putsk_const_str(asdf);
             putsk(" @ ");
-            _printk_outint("ptr", cast(ulong) arg);
+            _printf_outint("ptr", cast(ulong) arg);
             if (cast(ulong) arg != 0) {
                 putsk(" ");
                 putdyn(subarray, *arg, prenest);
@@ -568,12 +581,7 @@ private template Itoa(uint n) {
 private __gshared ulong lineno_max = 3;
 
 /// Print a string
-void printk(string A = __FILE__, int L = __LINE__, Args...)(Log l, string s, Args args) {
-    version(DiodeNoDebug) {
-        if (l == Log.DEBUG) return;
-    }
-    const ulong f = flags;
-    cli();
+void printf(string A = __FILE__, int L = __LINE__, Args...)(Log l, string s, Args args) {
     ulong maxl = 4;
     putck('[');
     switch (l) {
@@ -596,7 +604,7 @@ void printk(string A = __FILE__, int L = __LINE__, Args...)(Log l, string s, Arg
         maxl = 5;
         break;
     default:
-        printk(FATAL, "Invalid level: {}", cast(int) l);
+        printf(FATAL, "Invalid level: {}", cast(int) l);
         assert(0);
     }
     putsk("\x1b[0m] ");
@@ -630,10 +638,9 @@ void printk(string A = __FILE__, int L = __LINE__, Args...)(Log l, string s, Arg
     while (idx_into_s < s.length)
         putck(s[idx_into_s++]);
     putck('\n');
-    flags = f;
 }
 
 /// Print a string
-void printk(string A = __FILE__, int L = __LINE__, Args...)(string s, Args args) {
-    printk!(A, L, Args)(INFO, s, args);
+void printf(string A = __FILE__, int L = __LINE__, Args...)(string s, Args args) {
+    printf!(A, L, Args)(INFO, s, args);
 }

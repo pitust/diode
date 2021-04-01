@@ -26,6 +26,12 @@ struct t {
     ulong[256] pages;
     /// Pages mapped
     ulong[] memoryowned;
+    /// rsp0
+    ulong rsp0val;
+    /// rsp_ptr
+    // todo: rsp_ptr
+    ulong user_stack_top = 0;
+    ulong user_stack_bottom = 0;
 }
 
 /// A task creation request
@@ -48,7 +54,7 @@ private __gshared bool is_task_inited = false;
 /// Ensure tasks are ready
 void ensure_task_init() {
     if (!is_task_inited) {
-        printk("Initing task structures");
+        printk(DEBUG, "Initing task structures");
         is_task_inited = true;
         zygote_t.juice = 1;
         zygote_t.niceness = 20;
@@ -65,6 +71,7 @@ private extern (C) void task_trampoline(r* the_r) {
     void function(void*) func = the_r.func;
     void* arg = the_r.arg;
     free(the_r);
+    rsp0 = cast(void*)cur_t.rsp0val;
     // black_box(the_r);
     // sched_yield();
     func(arg);
@@ -111,6 +118,9 @@ void task_create(T)(void function(T*) func, T* arg, void* stack) {
     cur_t.next.prev = the_t;
     the_t.prev = cur_t;
     cur_t.next = the_t;
+    the_t.user_stack_top = 0;
+    the_t.user_stack_bottom = 0;
+    the_t.rsp0val = cast(ulong)alloc_stack();
 
     // assert(0);
 }
@@ -119,7 +129,23 @@ private ulong ncn_to_juice(ulong u) {
     return 41 - (20 + u);
 }
 
+/// Goodbye, cruel world!
+void task_exit() {
+    assert(cur_t.tid != 1, "Bootstrap task cannot be killed!");
+    asm {
+        cli;
+    }
+    t* self = cur_t;
+    self.prev.next = self.next;
+    self.next.prev = self.prev;
+    cur_t = cur_t.next;
+    free(self);
+    task_pls_die(cur_t.state.ptr);
+    assert(0, "Dead code reached");
+}
+
 private extern(C) void task_switch(ulong* buf);
+private extern(C) void task_pls_die(ulong* buf);
 
 private extern(C) void task_enqueue(ulong* buf) {
     ensure_task_init();
@@ -140,12 +166,17 @@ void sched_yield() {
         mov RAX, CR3;
         mov cr3, RAX;
     }
-    foreach (i; 0..256) {
+    foreach (i; 4..256) {
         cur_t.pages[i] = cr3[i];
         cr3[i] = 0;
     }
+    asm {
+        mov RAX, CR3;
+        mov CR3, RAX;
+    }
     task_switch(cur_t.next.state.ptr);
-    foreach (i; 0..256) {
+    rsp0 = cast(void*)cur_t.rsp0val;
+    foreach (i; 4..256) {
         cr3[i] = cur_t.pages[i];
     }
     asm {

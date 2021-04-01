@@ -2,6 +2,7 @@ module kernel.irq;
 
 import kernel.io;
 import kernel.mm;
+import kernel.pmap;
 import kernel.task;
 import kernel.util;
 import kernel.guards;
@@ -95,7 +96,20 @@ extern (C) void isrhandle_ec(ulong isr, ISRFrame* frame) {
             mov pfaddr, RAX;
         }
         printk(ERROR, "Page fault addr: {hex}", pfaddr);
+        if (frame.error & 4) {
+            if (cur_t.user_stack_bottom && pfaddr + 0x1000 > cur_t.user_stack_bottom) {
+                printk("Demand paging stack at {hex} (for {ptr})", cur_t.user_stack_bottom - 0x1000, frame.rip);
+                cur_t.user_stack_bottom -= 0x1000;
+                void* pg = page();
+                *get_user_pte_ptr(cast(void*)cur_t.user_stack_bottom).unwrap() = 7 | cast(ulong)pg;
+                flush_tlb();
+                push(cur_t.memoryowned, cast(ulong)pg);
+                return;
+            }
+        }
     }
+    import kernel.syscall.util : is_safe_function;
+    if (is_safe_function) printk(ERROR, " (in safe fn)");
     printk(ERROR, "ISR: {hex} code={hex}", isr, frame.error);
     printk(ERROR, "Frame: {hex}", frame);
     assert(false);
@@ -120,9 +134,6 @@ extern (C) void isrhandle_noec(ulong isr, ISRFrameNOEC* frame) {
             smoff.die();
             frame.rip += 2;
             frame.rax = cast(ulong) syscall(frame.rdi, cast(void*)frame.rsi);
-            // we also trash rcx/r11
-            frame.rcx = cast(ulong) 0xfeaddeadbeefcafe;
-            frame.r11 = cast(ulong) 0xfeaddeadbeefcafe;
             return;
         }
     }

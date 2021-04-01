@@ -236,8 +236,34 @@ user_branch:
     xor rdi, rdi
     iretq
 
+extern d_syscall
+
+; 1. Return: rax, rdx
+; 2. Parameter Registers: rdi, rsi, rdx, rcx, r8, r9
+; 3. Extra Parameters: stack (right to left)
+; 4. Stack Alignment: 16-byte at call
+; 5. Scratch Registers: rdi, rsi, rdx, rcx, r8, r9, r10, r11, rax
+
 platform_sc:
-    db 0xeb, 0xfe
+    push rcx
+    push r11
+    ; call d_syscall
+    pop r11
+    pop rcx
+    ; here i _would_ just sysret, but we need to clean up
+    ; all the scratch regs, since while they are scratch,
+    ; we don't want to leak kernel poineters and some
+    ; such every syscall. But since we get to fuck them up,
+    ; i just xor them out with themselves
+    xor rdi, rdi
+    xor rsi, rsi
+    xor rdx, rdx
+    xor rcx, rcx
+    xor r8, r8
+    xor r9, r9
+    xor r10, r10
+    xor r11, r11
+    sysret
 
 load_tss:
     mov ax, 0x28

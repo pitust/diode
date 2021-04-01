@@ -34,6 +34,14 @@ extern (C) struct TagCommandLine {
     char* cmdline;
 }
 
+/// RSDP stivale2 tag
+extern (C) struct TagRSDP {
+    /// the tag struct
+    align(8) Tag tag;
+    /// The RSDP
+    ulong rsdp;
+}
+
 private const ulong STRUCT_TAG_MEMMAP_ID = 0x2187f79e8612de07;
 /// Memory map entry
 extern (C) struct MemoryMapEntry {
@@ -60,9 +68,9 @@ extern (C) struct TagMemoryMap {
 /// A module
 extern (C) struct Module {
     ///
-    ulong begin;
+    ubyte* begin;
     ///
-    ulong end;
+    ubyte* end;
     ///
     char[128] name;
 }
