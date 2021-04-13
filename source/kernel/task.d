@@ -1,12 +1,13 @@
 module kernel.task;
 
 import kernel.mm;
-import kernel.platform;
 import kernel.io;
 import kernel.irq;
 import kernel.port;
 import kernel.util;
 import ldc.attributes;
+import kernel.hashmap;
+import kernel.platform;
 
 /// A `t` - a DIOS task.
 struct t {
@@ -19,17 +20,16 @@ struct t {
     /// the TID
     ulong tid;
     /// The mech ports owned by this `t`
-    PortRights[] ports;
-    /// The fake mech ports owned by this `t`
-    FakePort[] fakeports;
+    AnyPort[] ports;
     /// The low (user) pages owned by this `t`
     ulong[256] pages;
     /// Pages mapped
     ulong[] memoryowned;
     /// rsp0
     ulong rsp0val;
-    /// rsp_ptr
-    // todo: rsp_ptr
+    
+    HashMap pages_that_we_own;
+    
     ulong user_stack_top = 0;
     ulong user_stack_bottom = 0;
 }
@@ -47,9 +47,7 @@ private __gshared lock tidlock;
 private __gshared ulong tidbase = 1;
 private __gshared bool is_task_inited = false;
 
-// llvm.eh.sjlj.longjmp
-
-// llvm.eh.sjlj.setjmp
+static assert(t.sizeof < 4096);
 
 /// Ensure tasks are ready
 void ensure_task_init() {
@@ -72,20 +70,8 @@ private extern (C) void task_trampoline(r* the_r) {
     void* arg = the_r.arg;
     free(the_r);
     rsp0 = cast(void*)cur_t.rsp0val;
-    // black_box(the_r);
-    // sched_yield();
     func(arg);
-    // cli();
-    // cur_t.next.prev = cur_t.prev;
-    // cur_t.prev.next = cur_t.next;
-    // t* nx = cur_t.next;
-    // free!t(cur_t);
-    // cur_t = *&nx;
-    // is_go_commit_die = true;
-    // asm {
-    //     int 3;
-    // }
-
+    task_exit();
     assert(0);
 }
 
@@ -99,10 +85,10 @@ void task_create(T)(void function(T*) func, T* arg, void* stack) {
     const r* borrow_r = alloc!r(the_r);
     void* argg = cast(void*)borrow_r;
 
-    t* the_t = alloc!(t)();
-    memset(cast(byte*)the_t.pages.ptr, 0, 2048);
+    t* the_t = cast(t*)page();
+    memset(cast(byte*)the_t, 0, 4096);
     void*[0] a;
-    // the_t.memoryowned = *&a;
+
     ulong* s = the_t.state.ptr;
     asm {
         mov R13, stack;
@@ -118,11 +104,10 @@ void task_create(T)(void function(T*) func, T* arg, void* stack) {
     cur_t.next.prev = the_t;
     the_t.prev = cur_t;
     cur_t.next = the_t;
+    the_t.tid = ++tidbase;
     the_t.user_stack_top = 0;
     the_t.user_stack_bottom = 0;
     the_t.rsp0val = cast(ulong)alloc_stack();
-
-    // assert(0);
 }
 
 private ulong ncn_to_juice(ulong u) {
@@ -139,9 +124,10 @@ void task_exit() {
     self.prev.next = self.next;
     self.next.prev = self.prev;
     cur_t = cur_t.next;
+    free(cur_t.pages_that_we_own.data);
     free(self);
     task_pls_die(cur_t.state.ptr);
-    assert(0, "Dead code reached");
+    assert(0);
 }
 
 private extern(C) void task_switch(ulong* buf);
@@ -166,9 +152,9 @@ void sched_yield() {
         mov RAX, CR3;
         mov cr3, RAX;
     }
-    foreach (i; 4..256) {
+    foreach (i; 1..256) {
         cur_t.pages[i] = cr3[i];
-        cr3[i] = 0;
+        // if (cr3[i]) printk("i={} (tid={})", i, cur_t.tid);
     }
     asm {
         mov RAX, CR3;
@@ -176,8 +162,9 @@ void sched_yield() {
     }
     task_switch(cur_t.next.state.ptr);
     rsp0 = cast(void*)cur_t.rsp0val;
-    foreach (i; 4..256) {
+    foreach (i; 1..256) {
         cr3[i] = cur_t.pages[i];
+        // if (cr3[i]) printk("i={} (tid={})", i, cur_t.tid);
     }
     asm {
         mov RAX, CR3;
@@ -198,4 +185,16 @@ void sched_mayyield() {
     if (cur_t.juice)
         return;
     sched_yield();
+}
+
+/// Map
+void user_map(void* user) {
+    import kernel.mm;
+    import kernel.pmap;
+    
+    void* raw = page();
+    memset(cast(byte*)raw, 0, 4096);
+    *get_user_pte_ptr(user).unwrap() = 7 | cast(ulong) raw;
+    push(cur_t.memoryowned, cast(ulong)raw);
+    cur_t.pages_that_we_own.insertElem(cast(ulong)user, cast(ulong*)0);
 }

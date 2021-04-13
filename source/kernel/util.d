@@ -286,8 +286,16 @@ extern (C) byte* memcpy(byte* dst, const byte* src, size_t n) {
 /// area pointed to by mem with the constant byte data.
 ///
 /// The memset() function returns a pointer to the memory area mem.
-extern (C) byte* memset(byte* mem, byte data, size_t len) {
-    for (size_t i = 0; i < len; i++)
-        mem[i] = data;
+extern (C) byte* memset(byte* mem, int data, size_t len) {
+    for (size_t i = 0; i < len; i++) {
+        mem[i] = cast(byte)data;
+    }
+    return mem;
+}
+
+extern (C) ushort* memset16(ushort* mem, ushort data, size_t len) {
+    for (size_t i = 0; i < len; i++) {
+        mem[i] = cast(ushort)data;
+    }
     return mem;
 }

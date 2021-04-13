@@ -1,0 +1,14 @@
+run() {
+    ninja -C builddir run 2>&1
+}
+conf() {
+    if [ -e builddir ]; then
+        meson builddir --cross-file=x64-llvm.ini --reconfigure
+    else
+        meson builddir --cross-file=x64-llvm.ini
+    fi
+}
+reconf() {
+    rm -rf builddir
+    conf
+}

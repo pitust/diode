@@ -24,8 +24,8 @@ void copy_from_user(void* user, void* buf, ulong len) {
         cmp RCX, RDX;
         jge fail;
         
-        mov RAX, [RCX + RSI];
-        mov [RCX + RDI], RAX;
+        mov AL, [RCX + RSI];
+        mov [RCX + RDI], AL;
         inc RCX;
         jmp loop;
     fail:           ;
@@ -39,6 +39,7 @@ void copy_to_user(void* user, void* buf, ulong len) {
         return;
     }
     is_safe_function = true;
+    const auto g = no_smap();
     asm {
         mov R8, fail;
         mov RSI, buf;
@@ -50,8 +51,8 @@ void copy_to_user(void* user, void* buf, ulong len) {
         cmp RCX, RDX;
         jge fail;
         
-        mov RAX, [RCX + RSI];
-        mov [RCX + RDI], RAX;
+        mov AL, [RCX + RSI];
+        mov [RCX + RDI], AL;
 
         inc RCX;
         jmp loop;

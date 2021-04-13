@@ -4,7 +4,8 @@ project('code', ['d', 'c'],
     ]
 )
 
-libsys = run_command('find', ['source/libsys', '-type', 'f']).stdout().strip().split('\n')
+libled_src = run_command('find', ['source/libled', '-type', 'f']).stdout().strip().split('\n')
+libsys_src = run_command('find', ['source/libsys', '-type', 'f']).stdout().strip().split('\n')
 kernelsrc = run_command('find', ['source/kernel', '-type', 'f']).stdout().strip().split('\n')
 initrd_members = files(run_command('find', ['data', '-type', 'f']).stdout().strip().split('\n'))
 
@@ -23,13 +24,17 @@ kernel = executable('kernel.elf', 'source/vshared/share.d', kernelsrc, [
     'source/boot.s'
 ]),
     include_directories: ['source'],
-    link_args: ['-L=-T../source/kernel.ld'],
-    d_module_versions: ['DiodeNoDebug']
+    link_args: ['-L=-T../source/kernel.ld', '-betterC'],
+    d_module_versions: ['DiodeNoDebug'],
+    d_args: ['-betterC']
 )
 
-userinit = executable('init.elf', 'source/vshared/share.d', libsys, crt, 'source/progs/init.d',
+src = include_directories('source')
+
+userinit = executable('init.elf', 'source/vshared/share.d', libsys_src, libled_src, crt, 'source/progs/init.d',
     include_directories: ['source'],
-    link_args: ['-L=-T../source/user.ld']
+    d_args: ['-betterC'],
+    link_args: ['-L=-T../source/user.ld', '-betterC']
 )
 
 initrd_user_bins = custom_target('userbins', 
@@ -40,7 +45,7 @@ initrd_user_bins = custom_target('userbins',
 
 initrd = custom_target('initrd', 
     build_by_default: true,
-    command: ['/bin/sh', files('createinitrd.sh'), initrd_user_bins],
+    command: ['/bin/sh', files('createinitrd.sh'), initrd_user_bins, files('data/banner.txt')],
     output: 'initrd.bin'
 )
 
@@ -63,6 +68,20 @@ run_target('run',
         '-global', 'isa-debugcon.iobase=0xe9',
         '-cpu', 'max',
         '-machine', 'q35'
+    ],
+    depends: [iso]
+)
+run_target('runp',
+    command: [
+        qemu,
+        '-drive', 'id=asd,file=kernel.hdd,if=none',
+        '-device', 'virtio-blk-pci,drive=asd',
+        '-s',
+        '-debugcon', 'stdio',
+        '-global', 'isa-debugcon.iobase=0xe9',
+        '-cpu', 'max',
+        '-machine', 'q35',
+        '-S'
     ],
     depends: [iso]
 )

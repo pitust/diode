@@ -87,8 +87,6 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
 
     fgdt();
 
-    printk("Hello, {}!", "world");
-
     printk("Thank {} for blessing our ~flight~ operating system", info.brand);
     TagModules* m;
     TagRSDP* rsdptag;
@@ -115,7 +113,7 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
                 if (start == 0) {
                     start = 4096;
                 }
-                printk("  [{ptr}; {ptr}]", start, end);
+                printk(DEBUG, "  [{ptr}; {ptr}]", start, end);
                 import kernel.mm : addpage;
 
                 addpage(cast(ulong) start, cast(ulong)((end - start) / 4096), true);
@@ -144,15 +142,15 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
     }
 
     assert(m);
-    printk("Modules: ");
+    printk(DEBUG, "Modules: ");
     CPIOFile banner, init;
     {
         Module mod = m.modules[0];
         ubyte[] moddata = array(mod.begin, cast(ulong)(mod.end - mod.begin));
-        printk(" - {} ({hex} bytes)", mod.name, moddata.length);
+        printk(DEBUG, " - {} ({hex} bytes)", mod.name, moddata.length);
         CPIOFile[] f = parse_cpio(moddata);
         if (try_find(banner, "./banner.txt", f)) {
-            printk("MOTD: \n{}", transmute!(ubyte[], string)(banner.data));
+            printk("\n{}", transmute!(ubyte[], string)(banner.data));
         }
         find(init, "./init.elf", f);
     }
@@ -196,7 +194,6 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
     load_tss();
 
     ist1 = alloc_stack();
-    printk("Fun RSP0/IST1 in!");
     uint outp;
     asm {
         mov EAX, 7;
@@ -213,10 +210,11 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
             or RAX, 3 << 20;
             mov CR4, RAX;
         }
-        printk("SMAP/SMEP is enabled!");
+        printk(DEBUG, "SMAP/SMEP is enabled!");
     } else {
         printk(WARN, "SMAP is not available on your machine");
     }
+
 
     __gshared ulong[8192] stack1;
     task_create((CPIOFile* init) {
@@ -228,7 +226,7 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
         bool ok = load(rip, *init);
         assert(ok, "Init failed to load!");
 
-        push(cur_t.fakeports, create_bootstrap());
+        push(cur_t.ports, AnyPort(create_bootstrap()));
 
         user_branch(cast(ulong) rip, cast(void*) 0);
 

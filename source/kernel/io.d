@@ -569,6 +569,10 @@ private __gshared ulong lineno_max = 3;
 
 /// Print a string
 void printk(string A = __FILE__, int L = __LINE__, Args...)(Log l, string s, Args args) {
+    printk(L, A, l, s, args);
+}
+/// Print a string
+void printk(Args...)(int L, string A, Log l, string s, Args args) {
     version(DiodeNoDebug) {
         if (l == Log.DEBUG) return;
     }
@@ -602,14 +606,14 @@ void printk(string A = __FILE__, int L = __LINE__, Args...)(Log l, string s, Arg
     putsk("\x1b[0m] ");
     putsk_string(A[3 .. A.length]);
     putsk(":");
-    const(char[]) asds = Itoa!L;
-    foreach (c; asds) {
-        putck(c);
-    }
+    char[32] buffer;
+    char* asds = intToString(L, buffer.ptr, 10);
+    putsk(asds);
     putck(' ');
-    if (lineno_max < asds.length)
-        lineno_max = asds.length;
-    for (ulong i = asds.length; i < lineno_max; i++)
+    ulong asdslength = strlen(asds);
+    if (lineno_max < asdslength)
+        lineno_max = asdslength;
+    for (ulong i = asdslength; i < lineno_max; i++)
         putck(' ');
 
     int offinit = cast(int)(lineno_max + A.length - 5 + maxl);

@@ -1,7 +1,7 @@
 module kernel.syscall.dispatch;
 
 
-import kernel.syscall.kprint;
+import kernel.syscall.generic;
 import kernel.syscall.exec;
 import kernel.syscall.exit;
 import kernel.syscall.map;
@@ -16,13 +16,12 @@ long syscall(ulong sysno, ulong data) {
 
 /// Handle a syscall
 long syscall(ulong sysno, void* data) {
+    printk(DEBUG, "Syscall: {hex}({})", sysno, data);
     switch (sysno) {
     case Syscall.EXIT:
         return sys_exit(data);
     case Syscall.MAP:
         return sys_map(data);
-    case Syscall.SBRK:
-        return sys_sbrk(data);
     case Syscall.SEND:
         return sys_send(data);
     case Syscall.RECV:
@@ -33,11 +32,17 @@ long syscall(ulong sysno, void* data) {
         return sys_exec(data);
     case Syscall.KPRINT:
         return sys_kprint(data);
+    case Syscall.GET_TID:
+        return sys_get_tid(data);
+    case Syscall.FORK:
+        return sys_fork(data);
+    case Syscall.GET_STACK_BOUNDS:
+        return sys_get_stack_bounds(data);
     case cast(Syscall)0xC000:
         return sys_make_user_stack(data);
     default:
-        printk(WARN, "Invalid syscall performed: sys={hex} data={}", sysno, data);
-        assert(0);
-        return -1;
+        printk(WARN, "Invalid syscall performed: sys={hex}({}) data={}", sysno, cast(Syscall)sysno, data);
+        assert(0, "Invalid syscall");
+        return -ENOSYS;
     }
 }

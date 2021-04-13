@@ -72,7 +72,13 @@ void addpage(ulong addr, ulong pagecount, bool isinital = false) {
     if (isinital) {
         total += pagecount;
     } else {
+        import kernel.util;
+
         used -= pagecount;
+        memset16(cast(ushort*)first, 0xfeeb, pagecount * 2048);
+        // hmmm
+        first.next = next;
+        first.pagecount = pagecount;
     }
 }
 
@@ -183,13 +189,13 @@ void* alloc_user_virt() {
 
 /// Allocate a stack
 void* alloc_stack(t* cur = cur_t) {
+    stackbase += 0x2000;
     ulong base = stackbase;
     stackbase += 0x5000 + 0x4000;
     foreach (i; 0..8) {
         void* page = page();
         ulong* a = get_pte_ptr(cast(void*)(base + (i << 12))).unwrap();
         *a = 3 | cast(ulong)page;
-        push(cur.memoryowned, cast(ulong)page);
     }
     return cast(void*)(base + 0x8000);
 }
@@ -328,7 +334,7 @@ private void* kalloc(ulong size) {
 
 private void kfree(void* value, ulong size) {
     if (cast(ulong)value < poolbase) {
-        assert(0, "freeing stackdata is TODO");
+        return;
     }
     const ulong addr = cast(ulong) value - poolbase;
     size = (size + 15) & 0xffff_ffff_ffff_fff0;

@@ -140,6 +140,7 @@ Option!(ulong*) get_pte_ptr(void* va) {
             debug printk(DEBUG, "Paving a new memory page, index {hex} into PTE at {}, paving {}",
                     key, &page_table[key], new_page_table);
             memset(cast(byte*) new_page_table, 0, 4096);
+            debug printk(DEBUG, "paved");
             page_table[key] = 0x7 | cast(ulong) new_page_table;
         }
         control_pte = &page_table[key];

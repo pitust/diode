@@ -15,14 +15,14 @@ long sys_exit(void* data) {
     e.cmd = BootstrapCmd.NOTIFY_EXIT;
     e.code = 0;
     copy_from_user(data, cast(void*)&e.code, ulong.sizeof);
-    printk(DEBUG, "Exiting with code: {}", e.code);
+    printk(DEBUG, "pid({}) Exiting with code: {}", cur_t.tid, e.code);
     ulong* pt;
     asm {
         mov RAX, CR3;
         mov pt, RAX;
     }
 
-    foreach (i; 4..256) {
+    foreach (i; 1..256) {
         pt[i] = 0;
     }
 
@@ -38,14 +38,9 @@ long sys_exit(void* data) {
 
     // If they have at least one port,
     if (cur_t.ports.length > 0) {
-        printk(DEBUG, "Sending exit info to regular BSP");
+        printk(DEBUG, "Sending exit info to the BSP");
         // then signal on the bootstrap port
         cur_t.ports[0].send(/* ktid == pid */ cur_t.tid, dat);
-        // or if they have a fake port...
-    } else if (cur_t.fakeports.length > 0) {
-        printk(DEBUG, "Sending exit info to fake BSP");
-        // then signal on the kbootstrap port
-        cur_t.fakeports[0].send(/* ktid == pid */ cur_t.tid, dat);
     }
 
 

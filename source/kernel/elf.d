@@ -86,13 +86,14 @@ bool load(out ulong rip, CPIOFile exe) {
     ProgramHeader* _phdrs = cast(ProgramHeader*)(exe.data.ptr + elf.e_phoff);
     ProgramHeader[] phs = array(_phdrs, elf.e_phnum);
     foreach (ref ProgramHeader ph; phs) {
+        if (ph.p_type == /* PT_GNU_RELRO */ 0x6474e552) continue;
+        if (ph.p_type == /* PT_GNU_STACK */ 0x6474e551) continue;
         if (ph.p_type !=  /* PT_LOAD */ 1)
-            continue;
+            assert(0, "Invalid program header");
         ulong pagec = (ph.p_memsz + 4095) / 4096;
         foreach (i; 0 .. pagec) {
-            void* raw = page();
             ulong va = cast(ulong)(ph.p_vaddr + (i * 4096));
-            *get_user_pte_ptr(cast(void*) va).unwrap() = 7 | cast(ulong) raw;
+            user_map(cast(void*)va);
         }
         auto smap = no_smap();
         memcpy(cast(byte*) ph.p_vaddr, cast(byte*)(ph.p_offset + exe.data.ptr), ph.p_filesz);

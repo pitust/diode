@@ -10,6 +10,14 @@ import kernel.platform;
 import kernel.syscall.dispatch;
 import kernel.task : sched_yield;
 
+enum PageFaultError {
+    PRESENT = 1,
+    WRITE = 2,
+    USER = 4,
+    RESERVED = 8,
+    INSTRUCTION_FETCH = 16
+}
+
 private extern (C) struct ISRFrameNOEC {
     ulong r15;
     ulong r14;
@@ -97,13 +105,10 @@ extern (C) void isrhandle_ec(ulong isr, ISRFrame* frame) {
         }
         printk(ERROR, "Page fault addr: {hex}", pfaddr);
         if (frame.error & 4) {
-            if (cur_t.user_stack_bottom && pfaddr + 0x1000 > cur_t.user_stack_bottom) {
+            if (cur_t.user_stack_bottom && pfaddr + 0x1000 > cur_t.user_stack_bottom && pfaddr < cur_t.user_stack_top) {
                 printk("Demand paging stack at {hex} (for {ptr})", cur_t.user_stack_bottom - 0x1000, frame.rip);
                 cur_t.user_stack_bottom -= 0x1000;
-                void* pg = page();
-                *get_user_pte_ptr(cast(void*)cur_t.user_stack_bottom).unwrap() = 7 | cast(ulong)pg;
-                flush_tlb();
-                push(cur_t.memoryowned, cast(ulong)pg);
+                user_map(cast(void*)cur_t.user_stack_bottom);
                 return;
             }
         }
@@ -112,6 +117,13 @@ extern (C) void isrhandle_ec(ulong isr, ISRFrame* frame) {
     if (is_safe_function) printk(ERROR, " (in safe fn)");
     printk(ERROR, "ISR: {hex} code={hex}", isr, frame.error);
     printk(ERROR, "Frame: {hex}", frame);
+    foreach (ref pg; cur_t.pages_that_we_own.data) {
+        if (pg.isthere) {
+            printk(" Page @ {ptr}", pg.addr);
+        }
+    }
+    printk(ERROR, "in PID {}", cur_t.tid);
+    if (isr == /* page fault */ 0x0e) printk(ERROR, "PF error: {}", cast(PageFaultError)frame.error);
     assert(false);
 }
 

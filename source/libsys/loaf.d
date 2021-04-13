@@ -1,8 +1,7 @@
-module kernel.loafencode;
+module libsys.loaf;
 
-import kernel.io;
-import kernel.mm;
 import std.traits;
+import libsys.mem;
 
 private template isEnum(alias symb) {
     static if (is(symb == enum))
@@ -11,40 +10,46 @@ private template isEnum(alias symb) {
         enum bool isEnum = false;
 }
 
+byte[] loaf_encode(T)(T v) {
+    return loaf_encode(v);
+}
 /// Loaf encoder
-void encode(T)(ref T v, ref byte[] data) {
-
+byte[] loaf_encode(T)(ref T v) {
     static if (isIntegral!(T)) {
+        byte[] data = arr!(byte)();
         static if (isSigned!(T)) {
             if (v < 0) {
-                push(data, 1);
+                data = concat(data, 1);
                 v = -v;
             } else {
-                push(data, 0);
+                data = concat(data, 0);
             }
         }
         while (v > 0) {
             byte nibble = cast(byte)(v & 0xff);
             // encoding: 0x01 <nibble>
             if (nibble == 0 || nibble == 1) {
-                push(data, 1);
+                data = concat(data, 1);
             }
-            push(data, nibble);
+            data = concat(data, nibble);
             v = v >> 8;
         }
-        push(data, 0);
+        return concat(data, 0);
     } else static if(isEnum!(T)) {
-        encode(cast(ulong)v, data);
+        return encode(cast(ulong)v);
     } else {
+        byte[] data = arr!byte();
         static foreach (member; __traits(allMembers, T)) {
             {
-                static if (__traits(compiles, encode(__traits(getMember, v, member), data))) {
-                    encode(__traits(getMember, v, member), data);
+                static if (__traits(compiles, loaf_encode(__traits(getMember, v, member)))) {
+                    data = concat(data, loaf_encode(__traits(getMember, v, member)));
                 } else {
+                    loaf_encode(__traits(getMember, v, member));
                     static assert(0, "Can't print " ~ T.stringof ~ "." ~ member);
                 }
             }
         }
+        return data;
     }
 
 }

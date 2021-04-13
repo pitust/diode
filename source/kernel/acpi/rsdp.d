@@ -31,7 +31,7 @@ void load_rsdp(ulong u) {
     uint rsdt = load_u32(u + 16);
     uint entcount = (load_u32(rsdt + 4) - 36) / 4;
     tables = alloca_unsafe!(RSDPEntry)(0);
-    printk("ACPI Tables:");
+    printk(DEBUG, "ACPI Tables:");
     foreach (i; 0..entcount) {
         uint tbl = load_u32(i * 4 + 36 + rsdt);
         char[] s = array(cast(char*)tbl, 4);
@@ -39,6 +39,6 @@ void load_rsdp(ulong u) {
         e.table = cast(void*)tbl;
         e.id = s;
         push(tables, e);
-        printk(" - {}", s);
+        printk(DEBUG, " - {}", s);
     }
 }

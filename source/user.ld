@@ -1,7 +1,10 @@
 SECTIONS
 {
 
-    . = 0x000001100000000;
+
+    . = 0x000008000000000;
+
+    __elf_begin = .;
     .text : ALIGN(4096) {
         *(.text*)
     }
@@ -13,6 +16,10 @@ SECTIONS
 
     .data : ALIGN(4096) {
         *(.data*)
+        __init_begin = .;
+        *(.init_array)
+        *(.init_array*)
+        __init_end = .;
     }
 
     .tdata : ALIGN(4096) {
@@ -27,4 +34,5 @@ SECTIONS
         *(COMMON)
         *(.bss*)
     }
+    __elf_end = .;
 }

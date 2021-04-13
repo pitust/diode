@@ -1,4 +1,5 @@
-target create builddir/kernel.elf
+# target create builddir/kernel.elf
+target create builddir/init.elf
 gdb-remote 1234
 settings set target.x86-disassembly-flavor intel
 command alias mon process plugin packet monitor

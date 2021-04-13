@@ -3,6 +3,7 @@ module kernel.port;
 import kernel.io;
 import kernel.mm;
 import kernel.util;
+import vshared.share;
 
 /// Port message
 struct PortMessage {
@@ -21,14 +22,6 @@ enum PortRightsKind {
     SEND = 2,
     ANON = 4,
     ANON_ONLY = 8
-}
-
-/// Port errors
-enum PortError : byte {
-    EOK = 0,
-    EPERM = 1,
-    EINVAL = 2,
-    EEMPTY = -1,
 }
 
 /// Userland port rights
@@ -117,9 +110,6 @@ struct FakePort {
     PortError function (FakePort*, long pid, ref byte[] data) _recv;
     /// Send
     PortError function (FakePort*, long pid, byte[] data) _send;
-
-    /// Data
-    void* data;
     
     /// Recieve
     PortError recv(long pid, ref byte[] data) {
@@ -128,5 +118,50 @@ struct FakePort {
     /// Send
     PortError send(long pid, byte[] data) {
         return this._send(&this, pid, data);
+    }
+}
+private enum PType {
+    realp,
+    fake
+}
+struct AnyPort {
+    private PType p;
+    private union {
+        FakePort fake;
+        PortRights realp;
+    }
+    @disable this();
+
+    this(FakePort src) {
+        this.p = PType.fake;
+        this.fake = src;
+    }
+
+    this(PortRights src) {
+        this.p = PType.realp;
+        this.realp = src;
+    }
+
+    /// Copy
+    this(ref AnyPort rhs) {
+        if (rhs.p == PType.realp) this.realp = rhs.realp;
+        else this.fake = rhs.fake;
+        this.p = rhs.p;
+    }
+    /// Dtor
+    ~this() {
+        if (this.p == PType.realp) destroy(this.realp);
+    }
+
+    /// Recieve
+    PortError recv(long pid, ref byte[] data) {
+        if (this.p == PType.realp) return this.realp.recv(data);
+        return this.fake.recv(pid, data);
+    }
+
+    /// Send
+    PortError send(long pid, byte[] data) {
+        if (this.p == PType.realp) return this.realp.send(pid, data);
+        return this.fake.send(pid, data);
     }
 }

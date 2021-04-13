@@ -8,42 +8,42 @@ import libsys.syscall;
 import vshared.share;
 import libsys.util;
 
-/// putsk_const_str is like putsk but for const(string)
-void putsk_const_str(const(string) s) {
+/// puts_const_str is like puts but for const(string)
+void puts_const_str(const(string) s) {
     foreach (chr; s) {
         if (chr == 0)
             break;
-        putck(chr);
+        putc(chr);
     }
 }
 
-/// putsk_const_str is like putsk but for const(string)
-void putsk_const_str(string s) {
+/// puts_const_str is like puts but for const(string)
+void puts_const_str(string s) {
     foreach (chr; s) {
         if (chr == 0)
             break;
-        putck(chr);
+        putc(chr);
     }
 }
 
-/// putsk is a dumb version of printf (with no newline!)
-void putsk(char* s) {
+/// puts is a dumb version of printf (with no newline!)
+void puts(char* s) {
     for (int i = 0; s[i] != 0; i++) {
-        putck(s[i]);
+        putc(s[i]);
     }
 }
 
-/// putsk is a dumb version of printf (with no newline!)
-void putsk(immutable(char)[] s) {
+/// puts is a dumb version of printf (with no newline!)
+void puts(immutable(char)[] s) {
     foreach (chr; s) {
-        putck(chr);
+        putc(chr);
     }
 }
 
-/// putsk is a dumb version of printf (with no newline!)
-private void putsk_string(T)(T s) {
+/// puts is a dumb version of printf (with no newline!)
+private void puts_string(T)(T s) {
     foreach (chr; s) {
-        putck(chr);
+        putc(chr);
     }
 }
 
@@ -53,32 +53,32 @@ private __gshared int buf_idx = 0;
 /// Flush the I/O buffer
 void flush() {
     KPrintBuffer kbuf;
-    kbuf.len = buf_idx - 1;
+    kbuf.len = buf_idx;
     kbuf.ptr = buf.ptr;
     syscall(Syscall.KPRINT, cast(void*)&kbuf);
     buf_idx = 0;
 }
 
-/// putck prints a char (buffered)
-void putck(char c) {
+/// putc prints a char (buffered)
+extern(C) void putc(char c) {
     if (c != 0) {
-        if (buf_idx == 128) flush();
+        if (buf_idx >= 128) flush();
         buf[buf_idx++] = c;
         if (c == '\n') flush();
     }
 }
 
-/// putsk is a dumb version of printf (with no newline!)
-void putsk(T)(T s) {
+/// puts is a dumb version of printf (with no newline!)
+void puts(T)(T s) {
     static assert(is(Unqual!(T) : ArrayMarker!char));
     foreach (char chr; s) {
-        putck(chr);
+        putc(chr);
     }
 }
 
-/// putsk is a dumb version of printf (with no newline!)
-void putsk(char s) {
-    putck(s);
+/// puts is a dumb version of printf (with no newline!)
+void puts(char s) {
+    putc(s);
 }
 
 private struct EnumMarker {
@@ -153,12 +153,12 @@ private void _printf_outint(string subarray, ulong arg, bool bare = false) {
         break;
     case "hex":
         if (!bare)
-            putsk("0x");
+            puts("0x");
         base = 16;
         break;
     case "ptr":
         if (!bare)
-            putsk("0x");
+            puts("0x");
         base = 16;
         pad = 16;
         break;
@@ -166,12 +166,12 @@ private void _printf_outint(string subarray, ulong arg, bool bare = false) {
         break;
     case "oct":
         if (!bare)
-            putsk("0o");
+            puts("0o");
         base = 8;
         break;
     case "bin":
         if (!bare)
-            putsk("0b");
+            puts("0b");
         base = 2;
         break;
     default:
@@ -182,8 +182,8 @@ private void _printf_outint(string subarray, ulong arg, bool bare = false) {
     const long arr_offset_correctly_len = strlen(arr_offset_correctly);
     const long pad_needed = max(0, pad - arr_offset_correctly_len);
     for (int i = 0; i < pad_needed; i++)
-        putsk('0');
-    putsk(arr_offset_correctly);
+        puts('0');
+    puts(arr_offset_correctly);
 }
 
 private void _printf_outint(string subarray, long arg) {
@@ -191,23 +191,23 @@ private void _printf_outint(string subarray, long arg) {
     int base = 10;
     switch (subarray) {
     case "hex":
-        putsk("0x");
+        puts("0x");
         base = 16;
         break;
     case "ptr":
-        putsk("0x");
+        puts("0x");
         base = 16;
         pad = 8;
         break;
     case "":
         break;
     case "oct":
-        putsk("0o");
+        puts("0o");
         base = 8;
         break;
     case "bin":
         base = 2;
-        putsk("0b");
+        puts("0b");
         break;
     default:
         assert(false);
@@ -217,8 +217,8 @@ private void _printf_outint(string subarray, long arg) {
     const long arr_offset_correctly_len = strlen(arr_offset_correctly);
     const long pad_needed = max(0, pad - arr_offset_correctly_len);
     for (int i = 0; i < pad_needed; i++)
-        putsk('0');
-    putsk(arr_offset_correctly);
+        puts('0');
+    puts(arr_offset_correctly);
 }
 
 private template GetOMeta(string Target) {
@@ -289,95 +289,95 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
     static if (is(T : const char[])) {
         assert(subarray == "");
         if (is_field) {
-            putsk('"');
+            puts('"');
             foreach (chr; arg) {
                 if (chr == '\n') {
-                    putsk("\\n");
+                    puts("\\n");
                 } else if (chr > 0x7e || chr < 0x20) {
-                    putsk("\\x");
+                    puts("\\x");
                     _printf_outint("_chr_oob", cast(ulong) chr);
                 } else {
-                    putsk(chr);
+                    puts(chr);
                 }
             }
-            putsk('"');
+            puts('"');
         } else {
-            putsk_string(arg);
+            puts_string(arg);
         }
     }
     static if (is(T == EnumMarker)) {
         static foreach (k; __traits(allMembers, ObjTy)) {
             {
                 if (__traits(getMember, ObjTy, k) == arg) {
-                    putsk_string(k);
+                    puts_string(k);
                     return;
                 }
             }
         }
         // it's a bitfield
-        putck('[');
+        putc('[');
         bool do_space = true;
         static foreach (k; __traits(allMembers, ObjTy)) {
             {
                 if (__traits(getMember, ObjTy, k) & arg) {
                     if (do_space) {
                         do_space = false;
-                        putck(' ');
+                        putc(' ');
                     }
-                    putsk_string(k);
-                    putck(' ');
+                    puts_string(k);
+                    putc(' ');
                 }
             }
         }
-        putck(']');
+        putc(']');
     } else static if (is(T : const char*)) {
         assert(subarray == "");
         if (is_field) {
-            putsk('"');
+            puts('"');
             for (int i = 0; arg[i]; i++) {
                 if (arg[i] == '\n') {
-                    putsk("\\n");
+                    puts("\\n");
                 } else if (arg[i] > 0x7e || arg[i] < 0x20) {
-                    putsk("\\x");
+                    puts("\\x");
                     _printf_outint("_chr_oob", cast(ulong) arg[i]);
                 } else {
-                    putsk(arg[i]);
+                    puts(arg[i]);
                 }
             }
-            putsk('"');
+            puts('"');
         } else {
             for (int i = 0; arg[i]; i++) {
-                putck(arg[i]);
+                putc(arg[i]);
             }
         }
     } else static if (is(T : ArrayMarker!char)) {
         if (is_field) {
-            putsk('"');
+            puts('"');
             foreach (chr; arg) {
                 if (chr == '\n') {
-                    putsk("\\n");
+                    puts("\\n");
                 } else if (chr > 0x7e || chr < 0x20) {
-                    putsk("\\x");
+                    puts("\\x");
                     _printf_outint("_chr_oob", cast(ulong) chr);
                 } else {
-                    putsk(chr);
+                    puts(chr);
                 }
             }
-            putsk('"');
+            puts('"');
         } else {
-            putsk_string(arg);
+            puts_string(arg);
         }
     } else static if (is(T == char)) {
-        putsk("'");
+        puts("'");
         if (arg == '\n') {
-            putsk("\\n");
+            puts("\\n");
         } else if (arg > 0x7e || arg < 0x20) {
-            putsk("\\x");
+            puts("\\x");
             _printf_outint("_chr_oob", cast(ulong) arg);
         } else {
-            putsk(arg);
+            puts(arg);
         }
-        putsk("'");
+        puts("'");
     } else static if (is(T U == Hex!U)) {
         assert(subarray == "");
         putdyn("hex", arg.inner, prenest, is_field);
@@ -398,72 +398,72 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
     } else static if (is(T == ulong)) {
         _printf_outint(subarray, arg);
     } else static if (is(T == bool)) {
-        putsk(arg ? "true" : "false");
+        puts(arg ? "true" : "false");
     } else static if (is(T == void)) {
-        putsk("void");
+        puts("void");
     } else static if (is(T == void*)) {
         assert(subarray == "");
         _printf_outint("ptr", cast(ulong) arg);
     } else static if (is(T U == ArrayMarker!U)) {
-        putsk('[');
+        puts('[');
         bool is_first = true;
         foreach (member; arg) {
             if (is_first) {
-                putsk('\n');
+                puts('\n');
                 for (int i = 0; i < prenest; i++) {
-                    putsk(" ");
+                    puts(" ");
                 }
                 is_first = false;
             }
-            putsk("    ");
+            puts("    ");
             {
                 putdyn(subarray, member, prenest + 4, true);
             }
-            putsk('\n');
+            puts('\n');
             for (int i = 0; i < prenest; i++) {
-                putsk(" ");
+                puts(" ");
             }
         }
-        putsk(']');
+        puts(']');
     } else static if (is(T U == IOIterMarker!U)) {
-        putsk('[');
+        puts('[');
         bool is_first = true;
         int max_counter = 0;
         foreach (member; arg.ioiter()) {
             max_counter++;
             if (max_counter > 15) {
-                putsk("   ... snip");
-                putsk('\n');
+                puts("   ... snip");
+                puts('\n');
                 for (int i = 0; i < prenest; i++) {
-                    putsk(" ");
+                    puts(" ");
                 }
                 break;
             }
             if (is_first) {
-                putsk('\n');
+                puts('\n');
                 for (int i = 0; i < prenest; i++) {
-                    putsk(" ");
+                    puts(" ");
                 }
                 is_first = false;
             }
-            putsk("    ");
+            puts("    ");
             {
                 putdyn(subarray, member, prenest + 4, true);
             }
-            putsk('\n');
+            puts('\n');
             for (int i = 0; i < prenest; i++) {
-                putsk(" ");
+                puts(" ");
             }
         }
-        putsk(']');
+        puts(']');
     } else static if (is(T U == Option!U)) {
         if (arg.is_some()) {
-            putsk("Some(");
+            puts("Some(");
             putdyn(subarray, arg.unwrap(), prenest, true);
-            putsk(")");
+            puts(")");
         } else {
             assert(arg.is_none());
-            putsk("None");
+            puts("None");
         }
     } else {
         alias U = UnPtr!(T);
@@ -471,15 +471,15 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
             if (cast(ulong) arg != 0) {
                 putdyn(subarray, *arg, prenest);
             } else {
-                putsk("(null)");
+                puts("(null)");
             }
         } else static if (is(U == void*)) {
             string asdf = T.stringof;
-            putsk_const_str(asdf);
-            putsk(" @ ");
+            puts_const_str(asdf);
+            puts(" @ ");
             _printf_outint("ptr", cast(ulong) arg);
             if (cast(ulong) arg != 0) {
-                putsk(" ");
+                puts(" ");
                 putdyn(subarray, *arg, prenest);
             }
         } else {
@@ -488,24 +488,24 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
             } else static if (__traits(hasMember, T, "opFormatter")) {
                 arg.opFormatter(subarray, prenest);
             } else {
-                putsk('{');
+                puts('{');
                 bool is_first = true;
                 static foreach (member; [__traits(allMembers, T)]) {
                     static if (member.length > 6 && member[0 .. 6] == "_prnt_") {
                         if (is_first) {
-                            putsk('\n');
+                            puts('\n');
                             for (int i = 0; i < prenest; i++) {
-                                putsk(" ");
+                                puts(" ");
                             }
                             is_first = false;
                         }
-                        putsk("    ");
-                        putsk(member[6 .. member.length]);
-                        putsk(": ");
+                        puts("    ");
+                        puts(member[6 .. member.length]);
+                        puts(": ");
                         __traits(getMember, arg, member)(subarray, prenest + 4);
-                        putsk('\n');
+                        puts('\n');
                         for (int i = 0; i < prenest; i++) {
-                            putsk(" ");
+                            puts(" ");
                         }
                     } else static if (!isCallable!(__traits(getMember, arg, member)) && __traits(compiles, putdyn(
                             subarray, __traits(getMember, arg,
@@ -513,15 +513,15 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
                         static if (!__traits(compiles, __traits(getMember, arg, member)
                                 ._oskip) && !__traits(hasMember, arg, "__noshow_" ~ member)) {
                             if (is_first) {
-                                putsk('\n');
+                                puts('\n');
                                 for (int i = 0; i < prenest; i++) {
-                                    putsk(" ");
+                                    puts(" ");
                                 }
                                 is_first = false;
                             }
-                            putsk("    ");
-                            putsk(member);
-                            putsk(": ");
+                            puts("    ");
+                            puts(member);
+                            puts(": ");
                             static if (mixin(HasOMeta!(member))) {
                                 {
                                     mixin(GetOMeta!(member));
@@ -532,14 +532,14 @@ void putdyn(ObjTy)(string subarray, ref ObjTy arg, int prenest = 0, bool is_fiel
                                 putdyn(subarray, __traits(getMember, arg,
                                         member), prenest + 4, true);
                             }
-                            putsk('\n');
+                            puts('\n');
                             for (int i = 0; i < prenest; i++) {
-                                putsk(" ");
+                                puts(" ");
                             }
                         }
                     }
                 }
-                putsk('}');
+                puts('}');
             }
         }
     }
@@ -582,43 +582,50 @@ private __gshared ulong lineno_max = 3;
 
 /// Print a string
 void printf(string A = __FILE__, int L = __LINE__, Args...)(Log l, string s, Args args) {
+    printf(L, A, l, s, args);
+}
+/// Print a string
+void printf(Args...)(int L, string A, Log l, string s, Args args) {
+    version(DiodeNoDebug) {
+        if (l == Log.DEBUG) return;
+    }
     ulong maxl = 4;
-    putck('[');
+    putc('[');
     switch (l) {
     case DEBUG:
-        putsk("\x1b[30;1mDEBUG");
+        puts("\x1b[30;1mDEBUG");
         maxl = 5;
         break;
     case INFO:
-        putsk("\x1b[32;1mINFO");
+        puts("\x1b[32;1mINFO");
         break;
     case WARN:
-        putsk("\x1b[33;1mWARN");
+        puts("\x1b[33;1mWARN");
         break;
     case ERROR:
-        putsk("\x1b[31;1mERROR");
+        puts("\x1b[31;1mERROR");
         maxl = 5;
         break;
     case FATAL:
-        putsk("\x1b[31;1mFATAL");
+        puts("\x1b[31;1mFATAL");
         maxl = 5;
         break;
     default:
         printf(FATAL, "Invalid level: {}", cast(int) l);
         assert(0);
     }
-    putsk("\x1b[0m] ");
-    putsk_string(A[3 .. A.length]);
-    putsk(":");
-    const(char[]) asds = Itoa!L;
-    foreach (c; asds) {
-        putck(c);
-    }
-    putck(' ');
-    if (lineno_max < asds.length)
-        lineno_max = asds.length;
-    for (ulong i = asds.length; i < lineno_max; i++)
-        putck(' ');
+    puts("\x1b[0m] ");
+    puts_string(A[3 .. A.length]);
+    puts(":");
+    char[32] buffer;
+    char* asds = intToString(L, buffer.ptr, 10);
+    puts(asds);
+    putc(' ');
+    ulong asdslength = strlen(asds);
+    if (lineno_max < asdslength)
+        lineno_max = asdslength;
+    for (ulong i = asdslength; i < lineno_max; i++)
+        putc(' ');
 
     int offinit = cast(int)(lineno_max + A.length - 5 + maxl);
 
@@ -627,7 +634,7 @@ void printf(string A = __FILE__, int L = __LINE__, Args...)(Log l, string s, Arg
 
         // advance s
         while (s[idx_into_s] != '{')
-            putck(s[idx_into_s++]);
+            putc(s[idx_into_s++]);
         const int og_idx = idx_into_s + 1;
         while (s[idx_into_s++] != '}') {
         }
@@ -636,8 +643,8 @@ void printf(string A = __FILE__, int L = __LINE__, Args...)(Log l, string s, Arg
         putdyn(subarray, arg, offinit);
     }
     while (idx_into_s < s.length)
-        putck(s[idx_into_s++]);
-    putck('\n');
+        putc(s[idx_into_s++]);
+    putc('\n');
 }
 
 /// Print a string
