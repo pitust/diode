@@ -2,10 +2,13 @@ module kernel.syscall.io;
 
 import kernel.io;
 import kernel.mm;
+import kernel.port;
 import kernel.task;
 import vshared.share;
 import kernel.syscall.util;
 
+
+__gshared ulong portassocbase = 0x1000;
 // struct 
 
 /// Send
@@ -13,7 +16,7 @@ long sys_send(void* data) {
     KPortIOOp buf;
     copy_from_user(data, &buf, buf.sizeof);
     if (buf.kind == IOOpKind.KIND_RECV) /* Invalid operation */ return EINVAL;
-    if (cur_t.ports.length > buf.port) {
+    if (buf.port in cur_t.ports) {
         byte[] bufr = alloca_unsafe!(byte)(buf.len);
         copy_from_user(buf.data, bufr.ptr, buf.len);
         PortError e = cur_t.ports[buf.port].send(/* ktid == pid */ buf.kind == IOOpKind.KIND_SEND ? cur_t.tid : -1, bufr);
@@ -30,9 +33,22 @@ long sys_send(void* data) {
 }
 /// Recieve
 long sys_recv(void* data) {
+    KPortIOOp op;
+    copy_from_user(data, &op, op.sizeof);
+    if (op.kind != IOOpKind.KIND_RECV) return EINVAL;
+    printk("port: {}", op.port);
+    if (op.port !in cur_t.ports) return EBADF;
     assert(0, "sys_recv");
 }
 /// Create a port
 long sys_create_port(void* data) {
-    assert(0, "sys_create_port");
+    KPortCreate buf;
+    // buf.outp
+    // assert(0, "sys_create_port");
+    ulong x = portassocbase++;
+    Port* p = alloc!(Port)();
+    cur_t.ports.insertElem(x, AnyPort(PortRights(p, PortRightsKind.ANON | PortRightsKind.SEND | PortRightsKind.RECV)));
+    buf.outp = x;
+    copy_to_user(data, &buf, buf.sizeof);
+    return 0;
 }

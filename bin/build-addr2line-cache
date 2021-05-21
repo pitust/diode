@@ -1,0 +1,38 @@
+#!/usr/bin/env node
+let { platform } = require('os')
+let { existsSync, writeFileSync } = require('fs')
+const { execSync } = require('child_process')
+let nm = 'nm'
+if (platform() == 'darwin') {
+    if (existsSync('/opt/homebrew/opt/binutils/bin/nm'))
+        nm = '/opt/homebrew/opt/binutils/bin/nm'
+    else if (existsSync('/usr/local/opt/binutils/bin/nm'))
+        nm = '/usr/local/opt/binutils/bin/nm'
+}
+
+let out = execSync(`${nm} --line-numbers builddir/kernel.elf | ddemangle`)
+    .toString()
+    .trim()
+    .split('\n')
+    .map(e => e.trim())
+    .filter(e => e)
+    .map(e => e.replaceAll('\t', '    '))
+    .map(e => e.replace(/ [^ ]+\/\.\.\//g, ''))
+
+let p = Buffer.alloc(out.map(e => e.length - 19 + 16 + 1).reduce((a, b) => a + b, 0) + 8)
+p.writeBigUInt64LE(BigInt(out.length), 0)
+let i = 8
+out.forEach(e => {
+    console.log(e)
+    if (e[0] == 'U') return
+    let addr = BigInt('0x' + e.slice(0, 16))
+    let sym = e.slice(19)
+    p.writeBigUInt64LE(addr, i)
+    i += 8
+    p.writeBigUInt64LE(BigInt(sym.length), i)
+    i += 8
+    for (let c of sym) p.writeInt8(c.charCodeAt(0), i++)
+    p.writeInt8(0, i++)
+})
+
+writeFileSync('data/symbol.map', p.slice(0, i))

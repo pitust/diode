@@ -36,6 +36,7 @@ struct PortRights {
     PortError send(long pid, byte[] data) {
         if (!(kind & PortRightsKind.SEND)) {
             printk(ERROR, "Attempted to send from a recieve port (kind = {hex})", kind);
+            static import kernel.platform; kernel.platform.backtrace();
             return PortError.EINVAL;
         }
         if (pid == -1) {
@@ -81,12 +82,14 @@ struct PortRights {
     }
     /// Copy
     this(ref PortRights rhs) {
+        import kernel.platform;
         this.port = rhs.port;
         this.port.rc += 1;
-        this.kind = kind;
+        this.kind = rhs.kind;
     }
     /// Dtor
     ~this() {
+        import kernel.platform;
         this.port.rc -= 1;
         if (this.port.rc == 0) {
             printk(DEBUG, "Letting go of a port!");
@@ -148,6 +151,7 @@ struct AnyPort {
         else this.fake = rhs.fake;
         this.p = rhs.p;
     }
+    
     /// Dtor
     ~this() {
         if (this.p == PType.realp) destroy(this.realp);

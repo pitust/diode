@@ -14,27 +14,46 @@ yasm = generator(find_program('yasm'),
     arguments : [ '-felf64', '@INPUT@', '-o', '@OUTPUT@', '-i', meson.current_build_dir() + '/', '-gdwarf2' ]
 )
 
+link = generator(find_program('ld.lld'),
+    output : '@BASENAME@.elf',
+    arguments : [ '@INPUT@', '-o', '@OUTPUT@', '-m', 'elf_x86_64' ]
+)
+
 crt = yasm.process([
     'source/crt.s'
 ])
 
-kernel = executable('kernel.elf', 'source/vshared/share.d', kernelsrc, [
+kernel_stlib = build_target('kernel', 'source/vshared/share.d', kernelsrc, [
     'source/task.c',
 ], yasm.process([
     'source/boot.s'
 ]),
     include_directories: ['source'],
-    link_args: ['-L=-T../source/kernel.ld', '-betterC'],
+    link_args: ['-betterC', '--gcc=fake-gcc'],
     d_module_versions: ['DiodeNoDebug'],
-    d_args: ['-betterC']
+    d_args: ['-betterC'],
+    target_type: 'static_library'
+)
+
+kernel = custom_target('kernel.elf', 
+    build_by_default: true,
+    command: [find_program('ld.lld'), kernel_stlib, '-o', 'kernel.elf', '-m', 'elf_x86_64', '-T../source/kernel.ld'],
+    output: 'kernel.elf'
 )
 
 src = include_directories('source')
 
-userinit = executable('init.elf', 'source/vshared/share.d', libsys_src, libled_src, crt, 'source/progs/init.d',
+userinit_stlib = build_target('init', 'source/vshared/share.d', libsys_src, libled_src, crt, 'source/progs/init.d',
     include_directories: ['source'],
     d_args: ['-betterC'],
-    link_args: ['-L=-T../source/user.ld', '-betterC']
+    link_args: ['-betterC', '--gcc=fake-gcc'],
+    target_type: 'static_library'
+)
+
+userinit = custom_target('init.elf', 
+    build_by_default: true,
+    command: [find_program('ld.lld'), userinit_stlib, '-o', 'init.elf', '-m', 'elf_x86_64', '-T../source/user.ld'],
+    output: 'init.elf'
 )
 
 initrd_user_bins = custom_target('userbins', 
@@ -45,7 +64,7 @@ initrd_user_bins = custom_target('userbins',
 
 initrd = custom_target('initrd', 
     build_by_default: true,
-    command: ['/bin/sh', files('createinitrd.sh'), initrd_user_bins, files('data/banner.txt')],
+    command: ['/bin/sh', files('createinitrd.sh'), initrd_user_bins, files('data/banner.txt'), kernel],
     output: 'initrd.bin'
 )
 

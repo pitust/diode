@@ -1,0 +1,26 @@
+#!/usr/bin/env node
+const FILTER = true
+const os = require('os')
+let arch = os.arch()
+
+if (os.platform() == 'darwin' && os.release().startsWith('20.')) {
+    // we _may_ be on apple silicon.
+    // are we?
+    try {
+        require('child_process').execSync('arch -arm64 id').toString()
+        arch = 'arm64'
+    } catch {}
+}
+const args =
+    (os.platform() == 'darwin' && arch == 'arm64' && os.arch() == 'x64'
+        ? 'arch -arm64 '
+        : '') +
+    'ldc2 ' +
+    process.argv
+        .slice(2)
+        .filter(e => !FILTER || !e.includes('model=pic'))
+        .join(' ')
+
+process.exit(
+    require('child_process').spawnSync('zsh', ['-c', args], { stdio: 'inherit' }).status
+)

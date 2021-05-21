@@ -1,1 +1,0 @@
-Current executable set to '/Users/pitust/code/dios/builddir/kernel.elf' (x86_64).

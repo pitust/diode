@@ -69,12 +69,47 @@ void perror(string F = __FILE__, int L = __LINE__)(string e) {
     string err = "Unknown error";
 
     switch (errno) {
-    case EPERM:
-        err = "Permission denied";
-        break;
-    case EINVAL:
-        err = "Invalid operation";
-        break;
+        case EPERM: err = "<EPERM>"; break;
+        case ENOENT: err = "<ENOENT>"; break;
+        case ESRCH: err = "<ESRCH>"; break;
+        case EINTR: err = "<EINTR>"; break;
+        case EIO: err = "<EIO>"; break;
+        case ENXIO: err = "<ENXIO>"; break;
+        case E2BIG: err = "<E2BIG>"; break;
+        case ENOEXEC: err = "<ENOEXEC>"; break;
+        case EBADF: err = "Bad file descriptor"; break;
+        case ECHILD: err = "<ECHILD>"; break;
+        case EAGAIN: err = "<EAGAIN>"; break;
+        case ENOMEM: err = "<ENOMEM>"; break;
+        case EACCES: err = "<EACCES>"; break;
+        case EFAULT: err = "<EFAULT>"; break;
+        case ENOTBLK: err = "<ENOTBLK>"; break;
+        case EBUSY: err = "<EBUSY>"; break;
+        case EEXIST: err = "<EEXIST>"; break;
+        case EXDEV: err = "<EXDEV>"; break;
+        case ENODEV: err = "<ENODEV>"; break;
+        case ENOTDIR: err = "<ENOTDIR>"; break;
+        case EISDIR: err = "<EISDIR>"; break;
+        case EINVAL: err = "<EINVAL>"; break;
+        case ENFILE: err = "<ENFILE>"; break;
+        case EMFILE: err = "<EMFILE>"; break;
+        case ENOTTY: err = "<ENOTTY>"; break;
+        case ETXTBSY: err = "<ETXTBSY>"; break;
+        case EFBIG: err = "<EFBIG>"; break;
+        case ENOSPC: err = "<ENOSPC>"; break;
+        case ESPIPE: err = "<ESPIPE>"; break;
+        case EROFS: err = "<EROFS>"; break;
+        case EMLINK: err = "<EMLINK>"; break;
+        case EPIPE: err = "<EPIPE>"; break;
+        case EDOM: err = "<EDOM>"; break;
+        case ERANGE: err = "<ERANGE>"; break;
+        case EDEADLK: err = "<EDEADLK>"; break;
+        case ENAMETOOLONG: err = "<ENAMETOOLONG>"; break;
+        case ENOLCK: err = "<ENOLCK>"; break;
+        case ENOSYS: err = "<ENOSYS>"; break;
+        case ENOTEMPTY: err = "<ENOTEMPTY>"; break;
+        case ELOOP: err = "<ELOOP>"; break;
+        case ENOMSG: err = "<ENOMSG>"; break;
     default:
         printf(WARN, "unknown error {}", errno);
     }

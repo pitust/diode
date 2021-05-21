@@ -26,6 +26,7 @@ long sys_fork(void* data) {
         ulong stkbtm;
         void* data;
         ForkShmemPage[] pgs;
+        t* old;
     }
     ForkShmemPage[] pgs = [];
     foreach (e; cur_t.pages_that_we_own.data) {
@@ -34,7 +35,7 @@ long sys_fork(void* data) {
         byte* datap = cast(byte*)(*get_user_pte_ptr(cast(void*)e.addr).unwrap() & 0x000f_ffff_ffff_f000);
         push(pgs, ForkShmemPage(virt, datap));
     }
-    ForkShmem fosh = ForkShmem(0, 0, cur_t.user_stack_top, cur_t.user_stack_bottom, data, pgs);
+    ForkShmem fosh = ForkShmem(0, 0, cur_t.user_stack_top, cur_t.user_stack_bottom, data, pgs, cur_t);
     task_create(function (ForkShmem* fkshmem) {
         ulong* cr3;
         asm {
@@ -56,6 +57,10 @@ long sys_fork(void* data) {
         g.die();
         fkshmem.tid = cur_t.tid;
         ulong data = cast(ulong)fkshmem.data;
+        foreach (ref p; fkshmem.old.ports.iter()) {
+            cur_t.ports.insertElem(p[0], *p[1]);
+        }
+        asm { lfence; }
         fkshmem.spin = 1;
         asm { lfence; }
 

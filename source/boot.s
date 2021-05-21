@@ -50,8 +50,6 @@ global setjmp
 global longjmp
 global _rdrand
 
-extern sched_switch
-
 setjmp:
     mov [rdi +  0], rbx
     mov [rdi +  8], rbp

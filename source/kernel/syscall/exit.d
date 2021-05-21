@@ -36,8 +36,8 @@ long sys_exit(void* data) {
     byte[] dat = alloca!(byte)(0);
     encode(e, dat);
 
-    // If they have at least one port,
-    if (cur_t.ports.length > 0) {
+    // If they have the bootstrap port,
+    if (0 in cur_t.ports) {
         printk(DEBUG, "Sending exit info to the BSP");
         // then signal on the bootstrap port
         cur_t.ports[0].send(/* ktid == pid */ cur_t.tid, dat);

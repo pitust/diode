@@ -143,7 +143,7 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
 
     assert(m);
     printk(DEBUG, "Modules: ");
-    CPIOFile banner, init;
+    CPIOFile banner, dkm, init;
     {
         Module mod = m.modules[0];
         ubyte[] moddata = array(mod.begin, cast(ulong)(mod.end - mod.begin));
@@ -151,6 +151,11 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
         CPIOFile[] f = parse_cpio(moddata);
         if (try_find(banner, "./banner.txt", f)) {
             printk("\n{}", transmute!(ubyte[], string)(banner.data));
+        }
+        if (try_find(dkm, "./symbol.map", f)) {
+            import kernel.symbols;
+            printk("Enabling symbolification...");
+            load(cast(byte*)dkm.data.ptr);
         }
         find(init, "./init.elf", f);
     }
@@ -226,7 +231,7 @@ pragma(mangle, "_start") private extern (C) void kmain(StivaleHeader* info) {
         bool ok = load(rip, *init);
         assert(ok, "Init failed to load!");
 
-        push(cur_t.ports, AnyPort(create_bootstrap()));
+        cur_t.ports.insertElem(0, AnyPort(create_bootstrap()));
 
         user_branch(cast(ulong) rip, cast(void*) 0);
 

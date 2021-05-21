@@ -54,12 +54,12 @@ byte[] loaf_encode(T)(ref T v) {
 
 }
 
-void decode(T)(ref T v, ref byte[] data) {
+void loaf_decode(T)(ref T v, ref byte[] data) {
     ulong pos;
-    decode(v, pos, data);
+    loaf_decode(v, pos, data);
 }
 /// Loaf decoder
-void decode(T)(ref T v, ref ulong pos, ref byte[] data) {
+void loaf_decode(T)(ref T v, ref ulong pos, ref byte[] data) {
     static if (isIntegral!(T)) {
         bool sign = false;
         static if (isSigned!(T)) {
@@ -93,7 +93,7 @@ void decode(T)(ref T v, ref ulong pos, ref byte[] data) {
     } else {
         static foreach (member; __traits(allMembers, T)) {
             {
-                decode(__traits(getMember, v, member), pos, data);
+                loaf_decode(__traits(getMember, v, member), pos, data);
             }
         }
     }

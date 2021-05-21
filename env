@@ -12,3 +12,5 @@ reconf() {
     rm -rf builddir
     conf
 }
+
+export PATH=`pwd`/bin:$PATH

@@ -3,9 +3,9 @@ This is the home of diodeOS, a kernel (and in the future userland) with the goal
 
 ## Todo
  - [x] fix that task switcher crash bug
- - [ ] userland
- - [ ] syscall
+ - [x] userland
+ - [x] syscall
  - [ ] vfs
- - [ ] initrd parsing
+ - [x] initrd parsing
  - [ ] fs
  - [ ] posix compliance

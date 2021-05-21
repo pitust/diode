@@ -1,6 +1,7 @@
 module kernel.hashmap;
 
 import kernel.mm;
+import std.typecons;
 
 struct HMI {
     ulong addr;
@@ -79,5 +80,61 @@ struct HashMap {
     ref ulong* opIndex(ulong addr) {
         assert(addr in this);
         return *getElem(addr);
+    }
+}
+
+struct BetterHashMap(U) {
+    HashMap _h;
+
+    ref U* opIndex(ulong addr) {
+        assert(addr in this);
+        return *cast(U**)_h.getElem(addr);
+    }
+
+    bool opBinaryRight(string s)(ulong k) if (s == "in")
+    {
+        return _h.hasElem(k);
+    }
+
+    void deleteElem(ulong addr) {
+        if (!(addr in _h)) return;
+        ulong* a = _h[addr];
+        free(a);
+        _h.deleteElem(addr);
+    }
+
+    void insertElem(Args...)(ulong addr, Args argz) {
+        U* a = alloc!U(U(argz));
+        _h.insertElem(addr, cast(ulong*)a);
+    }
+
+    BHMIter!U iter() {
+        return BHMIter!(U)(_h.data);
+    }
+}
+
+struct BHMIter(T) {
+    HMI[] _inner;
+    ulong i = 0;
+
+    /// Is it empty?
+    bool empty() const {
+        ulong i = this.i;
+        while (!this._inner[i].isthere && i < _inner.length) i++;
+        // The range is consumed when begin equals end
+        return _inner.length > i;
+    }
+
+    /// Next element pls
+    void popFront() {
+        // Skipping the first element is achieved by
+        // incrementing the beginning of the range
+        i++;
+        while (!this._inner[i].isthere && i < _inner.length) i++;
+    }
+
+    /// First element ptr (reborrowed)
+    Tuple!(ulong, T*) front() const {
+        return tuple(cast(ulong)this._inner[i].addr, cast(T*) this._inner[i].rc);
     }
 }

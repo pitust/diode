@@ -102,7 +102,7 @@ extern (C) void isrhandle_ec(ulong isr, ISRFrame* frame) {
         asm {
             mov RAX, CR2;
             mov pfaddr, RAX;
-        }
+        }         
         printk(ERROR, "Page fault addr: {hex}", pfaddr);
         if (frame.error & 4) {
             if (cur_t.user_stack_bottom && pfaddr + 0x1000 > cur_t.user_stack_bottom && pfaddr < cur_t.user_stack_top) {

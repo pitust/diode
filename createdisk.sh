@@ -1,9 +1,9 @@
 #!/bin/sh
 set -e
-
+set -v
 IMPORT_PY=`echo \`pwd\`/$0 | sed 's/createdisk\.sh//g'`import.py
 KERN=`echo $1`
-WORK_DIR=`echo $1 | sed 's/kernel\.elf//g'`
+WORK_DIR=`pwd`
 HDD=`echo $1 | sed 's/\.elf/.hdd/g'`
 MAGIC_CPIO=$2
 if [ ! -e $HDD ]; then truncate $HDD -s 64M; duogpt $HDD; fi

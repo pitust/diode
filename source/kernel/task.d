@@ -19,8 +19,8 @@ struct t {
     ulong niceness;
     /// the TID
     ulong tid;
-    /// The mech ports owned by this `t`
-    AnyPort[] ports;
+    /// The meh ports owned by this `t`
+    BetterHashMap!AnyPort ports;
     /// The low (user) pages owned by this `t`
     ulong[256] pages;
     /// Pages mapped
@@ -62,8 +62,6 @@ void ensure_task_init() {
         cur_t = &zygote_t;
     }
 }
-
-private __gshared bool is_go_commit_die = false;
 
 private extern (C) void task_trampoline(r* the_r) {
     void function(void*) func = the_r.func;

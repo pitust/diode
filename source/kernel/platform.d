@@ -2,6 +2,8 @@ module kernel.platform;
 
 import kernel.optional;
 import ldc.attributes;
+import kernel.symbols;
+
 
 /// Call a system call
 extern (C) void platform_sc(ulong sysno, void* data);
@@ -58,13 +60,14 @@ void backtrace() {
 
     printk(FATAL, "Stack trace:");
     for (;;) {
+        Symbol sym = symbolify(stk.rip);
         // Unwind to previous stack frame
-        printk(FATAL, "  {ptr}", stk.rip);
+        printk(FATAL, "  {} + {}", sym.name, sym.off);
         if (stk.rbp == cast(Stackframe*) 0 || stk.rip == 0)
             break;
         if (stk.rip < 0xffffffff80000000)
             break;
-        if ((cast(ulong) stk.rbp) < 0xffffffff80000000)
+        if ((cast(ulong) stk.rbp) < 0xfff8_0000_0000_0000)
             break;
         stk = stk.rbp;
     }
