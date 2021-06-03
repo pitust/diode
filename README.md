@@ -5,7 +5,8 @@ This is the home of diodeOS, a kernel (and in the future userland) with the goal
  - [x] fix that task switcher crash bug
  - [x] userland
  - [x] syscall
- - [ ] vfs
  - [x] initrd parsing
+ - [ ] new VM subsystem
+ - [ ] vfs
  - [ ] fs
  - [ ] posix compliance
