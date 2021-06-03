@@ -1,5 +1,6 @@
 module kernel.hashmap;
 
+import kernel.io;
 import kernel.mm;
 import std.typecons;
 
@@ -120,9 +121,9 @@ struct BHMIter(T) {
     /// Is it empty?
     bool empty() const {
         ulong i = this.i;
-        while (!this._inner[i].isthere && i < _inner.length) i++;
+        while (i < _inner.length && !this._inner[i].isthere) i++;
         // The range is consumed when begin equals end
-        return _inner.length > i;
+        return i >= _inner.length;
     }
 
     /// Next element pls
@@ -130,7 +131,7 @@ struct BHMIter(T) {
         // Skipping the first element is achieved by
         // incrementing the beginning of the range
         i++;
-        while (!this._inner[i].isthere && i < _inner.length) i++;
+        while (i < _inner.length && !this._inner[i].isthere) i++;
     }
 
     /// First element ptr (reborrowed)

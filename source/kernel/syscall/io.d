@@ -9,7 +9,6 @@ import kernel.syscall.util;
 
 
 __gshared ulong portassocbase = 0x1000;
-// struct 
 
 /// Send
 long sys_send(void* data) {
@@ -38,6 +37,23 @@ long sys_recv(void* data) {
     if (op.kind != IOOpKind.KIND_RECV) return EINVAL;
     printk("port: {}", op.port);
     if (op.port !in cur_t.ports) return EBADF;
+    AnyPort* p = cur_t.ports[op.port];
+    byte[] arr = [];
+    PortError e = p.recv(cur_t.tid, arr);
+    while (e == PortError.EEMPTY) {
+        sched_yield();
+        e = p.recv(cur_t.tid, arr);
+    }
+    switch (e) {
+        case PortError.EPERM:
+            return EPERM;
+        case PortError.EINVAL:
+            return EINVAL;
+        case PortError.EEMPTY:
+            return EEMPTY;
+        default:
+    }
+    printk("data: {hex}", arr);
     assert(0, "sys_recv");
 }
 /// Create a port
@@ -49,6 +65,7 @@ long sys_create_port(void* data) {
     Port* p = alloc!(Port)();
     cur_t.ports.insertElem(x, AnyPort(PortRights(p, PortRightsKind.ANON | PortRightsKind.SEND | PortRightsKind.RECV)));
     buf.outp = x;
+    printk("port allocated: {} {}", x, x in cur_t.ports);
     copy_to_user(data, &buf, buf.sizeof);
     return 0;
 }

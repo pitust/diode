@@ -18,9 +18,10 @@ const args =
     'ldc2 ' +
     process.argv
         .slice(2)
-        .filter(e => !FILTER || !e.includes('model=pic'))
-        .join(' ')
-
+        .filter(e => !FILTER || !e.includes('model='))
+        .join(' ') + ' --code-model=large'
+console.log(args)
+require('fs').writeFileSync('AAAA.txt', args)
 process.exit(
     require('child_process').spawnSync('zsh', ['-c', args], { stdio: 'inherit' }).status
 )

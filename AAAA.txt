@@ -1,0 +1,1 @@
+arch -arm64 ldc2 -L=--version /var/folders/4y/_38brkys0wjgsnl5nfqnp13h0000gp/T/tmpu_y0_3_6.d --float-abi=soft --disable-red-zone -mtriple amd64-unknown-elf --frame-pointer=all -g --d-debug -mattr=-sse,-sse2,-sse3,-ssse3 --enable-asserts=true --link-internally --code-model=large

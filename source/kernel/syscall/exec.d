@@ -1,5 +1,6 @@
 module kernel.syscall.exec;
 
+import kernel.io;
 import kernel.mm;
 import kernel.pmap;
 import kernel.task;
@@ -59,6 +60,7 @@ long sys_fork(void* data) {
         ulong data = cast(ulong)fkshmem.data;
         foreach (ref p; fkshmem.old.ports.iter()) {
             cur_t.ports.insertElem(p[0], *p[1]);
+            printk("port: {}", p[0]);
         }
         asm { lfence; }
         fkshmem.spin = 1;

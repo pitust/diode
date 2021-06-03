@@ -44,6 +44,7 @@ const ENOTEMPTY = vshared.share.ENOTEMPTY;
 const ELOOP = vshared.share.ELOOP;
 const EWOULDBLOCK = vshared.share.EWOULDBLOCK;
 const ENOMSG = vshared.share.ENOMSG;
+const EEMPTY = vshared.share.EEMPTY;
 
 /// The errno
 __gshared long errno = 0;
@@ -106,10 +107,11 @@ void perror(string F = __FILE__, int L = __LINE__)(string e) {
         case EDEADLK: err = "<EDEADLK>"; break;
         case ENAMETOOLONG: err = "<ENAMETOOLONG>"; break;
         case ENOLCK: err = "<ENOLCK>"; break;
-        case ENOSYS: err = "<ENOSYS>"; break;
-        case ENOTEMPTY: err = "<ENOTEMPTY>"; break;
+        case ENOSYS: err = "Function not implemented"; break;
+        case ENOTEMPTY: err = "Directory not empty"; break;
         case ELOOP: err = "<ELOOP>"; break;
         case ENOMSG: err = "<ENOMSG>"; break;
+        case EEMPTY: err = "File empty"; break;
     default:
         printf(WARN, "unknown error {}", errno);
     }

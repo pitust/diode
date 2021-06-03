@@ -42,7 +42,7 @@ long syscall(ulong sysno, void* data) {
         return sys_make_user_stack(data);
     default:
         printk(WARN, "Invalid syscall performed: sys={hex}({}) data={}", sysno, cast(Syscall)sysno, data);
-        assert(0, "Invalid syscall");
+        // assert(0, "Invalid syscall");
         return -ENOSYS;
     }
 }
