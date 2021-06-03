@@ -45,7 +45,7 @@ int app() {
         // parent
         Meme x = Meme(69, 420, 1337);
         meh_port_send(p, loaf_encode(x));
-        meh_port_delete(p);
+        if (meh_port_delete(p)) { perror("meh_port_delete"); return 1; }
     } else {
         // child
         byte[] da;
@@ -53,7 +53,7 @@ int app() {
         Meme x;
         loaf_decode(x, da);
         printf("m: {}", x);
-        meh_port_delete(p);
+        if (meh_port_delete(p)) { perror("meh_port_delete"); return 1; }
     }
     return 3;
 }
