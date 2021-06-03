@@ -63,12 +63,15 @@ long meh_port_send(ref port_t p, byte[] data, bool hidepid = false) {
     return meh_port_send(p, data.ptr, data.length, hidepid);
 }
 long meh_port_recv(ref port_t p, out byte[] data) {
+    import libsys.entry;
+
     void* dat;
     ulong le;
     long da = meh_port_recv(p, dat, le);
     if (da) return da;
     byte[] d = alloc_array!(byte)(le);
     data = d;
+    memcpy(d.ptr, cast(byte*)dat, le);
     free(dat);
     return 0;
 }
@@ -89,6 +92,7 @@ long meh_port_recv(ref port_t p, out void* data, out ulong len) {
         perror("meh_port_recv: munmap");
         exit(1);
     }
+    data = dat;
     return 0;
 }
 long meh_port_clone(ref port_t pin, ulong flags, out port_t pout) {
