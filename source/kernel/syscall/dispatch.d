@@ -38,11 +38,13 @@ long syscall(ulong sysno, void* data) {
         return sys_fork(data);
     case Syscall.GET_STACK_BOUNDS:
         return sys_get_stack_bounds(data);
+    case Syscall.DESTROY_PORT:
+        return sys_destroy_port(data);
     case cast(Syscall)0xC000:
         return sys_make_user_stack(data);
     default:
         printk(WARN, "Invalid syscall performed: sys={hex}({}) data={}", sysno, cast(Syscall)sysno, data);
         // assert(0, "Invalid syscall");
-        return -ENOSYS;
+        return ENOSYS;
     }
 }

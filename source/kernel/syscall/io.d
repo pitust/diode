@@ -35,7 +35,6 @@ long sys_recv(void* data) {
     KPortIOOp op;
     copy_from_user(data, &op, op.sizeof);
     if (op.kind != IOOpKind.KIND_RECV) return EINVAL;
-    printk("port: {}", op.port);
     if (op.port !in cur_t.ports) return EBADF;
     AnyPort* p = cur_t.ports[op.port];
     byte[] arr = [];
@@ -53,8 +52,15 @@ long sys_recv(void* data) {
             return EEMPTY;
         default:
     }
-    printk("data: {hex}", arr);
-    assert(0, "sys_recv");
+    assert(arr.length <= 4096);
+    void* tgd = alloc_user_virt();
+    user_map(tgd);
+    copy_to_user(tgd, arr.ptr, arr.length);
+    op.data = tgd;
+    op.len = arr.length;
+    free(arr);
+    copy_to_user(data, &op, op.sizeof);
+    return 0;
 }
 /// Create a port
 long sys_create_port(void* data) {
@@ -68,4 +74,8 @@ long sys_create_port(void* data) {
     printk("port allocated: {} {}", x, x in cur_t.ports);
     copy_to_user(data, &buf, buf.sizeof);
     return 0;
+}
+/// Destroy a port
+long sys_destroy_port(void* data) {
+    return ENOSYS;
 }
