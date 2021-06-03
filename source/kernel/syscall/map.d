@@ -20,8 +20,8 @@ long sys_map(void* data) {
     copy_from_user(data, &map, MMap.sizeof);
     if (map.flags & MMapFlags.MAP_FIXED && (cast(ulong)map.addr) < (1UL << 32)) return EINVAL;
     if (map.flags & MMapFlags.MAP_UNMAP) {
-        printk(WARN, "TODO: mmap(MAP_UNMAP)");
-        return ENOSYS;
+        *get_user_pte_ptr(map.addr).unwrap() = 0;
+        return 0;
     }
     if (!(map.flags & MMapFlags.MAP_PRIVATE)) return EINVAL;
     
