@@ -64,6 +64,29 @@ extern (C) byte* memset(byte* mem, int data, size_t len) {
     return mem;
 }
 
+/// Do stack unwinding
+private void do_backtrace() {
+    import kernel.platform : Stackframe;
+    Stackframe* stk;
+    asm {
+        mov stk, RBP;
+    }
+    import libsys.io : printf, FATAL;
+
+    printf(FATAL, "Stack trace:");
+    for (;;) {
+        // Unwind to previous stack frame
+        printf(FATAL, "  {hex}", stk.rip);
+        if (stk.rbp == cast(Stackframe*) 0 || stk.rip == 0)
+            break;
+        if (stk.rip > 0xffffffff80000000)
+            break;
+        if ((cast(ulong) stk.rbp) > 0xfff8_0000_0000_0000)
+            break;
+        stk = stk.rbp;
+    }
+}
+
 pragma(mangle, "__assert") extern (C) void cause_assert(immutable(char)* assertion, immutable(char)* file, int line) {
     char[512] buf;
     char[512] buf2;
@@ -83,6 +106,7 @@ pragma(mangle, "__assert") extern (C) void cause_assert(immutable(char)* asserti
     kbuf.ptr = buf.ptr;
     ulong exitcode = 127;
     syscall(Syscall.KPRINT, cast(void*)&kbuf);
+    do_backtrace();
     syscall(Syscall.EXIT, &exitcode);
     while (1) {
     }

@@ -46,7 +46,8 @@ bool intr() {
 /// The I/O port mapped to QEMU's stdout
 public const DEBUG_IO_PORT_NUM = 0xe9;
 
-private extern (C) struct Stackframe {
+/// A stack frame
+extern (C) struct Stackframe {
     Stackframe* rbp;
     ulong rip;
 }
